@@ -7,6 +7,7 @@ use App\Models\JobCategory;
 use Illuminate\Http\Request;
 use App\Models\Job;
 use App\Models\User;
+use App\Models\Payment;
 use Carbon\Carbon;
 use Brian2694\Toastr\Facades\Toastr;
 
@@ -125,8 +126,7 @@ class AdminController extends Controller
     public function allpayments()
     {    
 
-        $allpayments = Job::where('status', 'draft')
-        ->get();
+        $allpayments = Payment::with('contract')->latest()->get();
         return view('superadmin.payments.allpayments', compact('allpayments'));
 
     }
