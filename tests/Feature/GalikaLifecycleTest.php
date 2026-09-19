@@ -166,15 +166,14 @@ class GalikaLifecycleTest extends TestCase
         $this->assertDatabaseHas('galika_wealth_items',['user_id'=>$u->id,'lane'=>'CONSULTING','title'=>'AI analytics project','state'=>'DISCOVERED']);
     }
 
-    public function test_canary_records_configured_user_readiness(): void
+    public function test_canary_requires_real_pipeline_readiness(): void
     {
         $u=User::factory()->create();
         GalikaProfile::create(['user_id'=>$u->id,'timezone'=>'UTC','autonomous_apply_enabled'=>true]);
         $run=app(\App\Galika\Services\CanaryService::class)->run($u->id);
-        $this->assertSame('PASSED',$run->state);
-        $this->assertDatabaseHas('galika_canary_runs',['user_id'=>$u->id,'state'=>'PASSED']);
+        $this->assertSame('FAILED',$run->state);
+        $this->assertTrue(collect($run->steps)->contains(fn($s)=>$s['step']==='verified_documents'&&!$s['ok']));
     }
-
 
     public function test_supported_oauth_providers_build_authorization_redirects(): void
     {
@@ -264,5 +263,72 @@ class GalikaLifecycleTest extends TestCase
         $connection=\App\Models\GalikaConnection::where('user_id',$u->id)->where('provider','airtable')->firstOrFail();
         $this->assertSame('appeiqT7XOsucMMOX',data_get($connection->metadata,'base_id'));
         $this->assertSame('GAN Wealth OS',data_get($connection->metadata,'base_name'));
+    }
+
+
+    public function test_material_answer_is_saved_as_reusable_knowledge(): void
+    {
+        $u=User::factory()->create();
+        $o=GalikaOpportunity::create(['canonical_key'=>'know','source'=>'test','employer'=>'Acme','title'=>'AI Engineer','url'=>'https://example.test','discovered_at'=>now()]);
+        $a=GalikaApplication::create(['user_id'=>$u->id,'opportunity_id'=>$o->id,'application_key'=>'know-app','status'=>'BLOCKED_REQUIRES_USER']);
+        $d=GalikaDecision::create(['application_id'=>$a->id,'decision_type'=>'MATERIAL_ANSWER','question'=>'Are you willing to relocate?','status'=>'OPEN']);
+
+        $this->actingAs($u)->post("/galika/decisions/{$d->id}",['answer'=>'Yes, where appropriate'])->assertRedirect();
+
+        $this->assertDatabaseHas('galika_answer_knowledge',[
+            'user_id'=>$u->id,'intent'=>'RELOCATION','answer'=>'Yes, where appropriate'
+        ]);
+    }
+
+    public function test_location_feasibility_blocks_restricted_remote_region_without_evidence(): void
+    {
+        $u=User::factory()->create();
+        GalikaProfile::create(['user_id'=>$u->id,'timezone'=>'UTC','willing_to_relocate'=>false]);
+        $r=app(\App\Galika\Services\LocationFeasibilityService::class)->evaluate($u->id,['location'=>'Remote - US only']);
+        $this->assertFalse($r['feasible']);
+        $this->assertSame('REMOTE_RESTRICTED',$r['reason']);
+    }
+
+    public function test_trust_engine_flags_scam_language(): void
+    {
+        $o=GalikaOpportunity::create([
+            'canonical_key'=>'risk','source'=>'test','employer'=>'Unknown','title'=>'Executive Role',
+            'url'=>'https://jobs.example.test/risk','description'=>'Pay a fee using crypto before interview',
+            'source_authority'=>'AGGREGATOR','discovered_at'=>now()
+        ]);
+        $r=app(\App\Galika\Services\OpportunityTrustService::class)->assess($o);
+        $this->assertSame('HIGH_RISK',$r['state']);
+    }
+
+    public function test_campaign_prefers_referral_when_relationship_exists(): void
+    {
+        $u=User::factory()->create();
+        $employer=\App\Models\GalikaEmployer::create(['canonical_name'=>'Acme']);
+        $person=\App\Models\GalikaPerson::create(['employer_id'=>$employer->id,'name'=>'Jane Doe','role'=>'Engineer']);
+        \App\Models\GalikaRelationship::create(['user_id'=>$u->id,'person_id'=>$person->id,'strength'=>'STRONG']);
+        $o=GalikaOpportunity::create([
+            'canonical_key'=>'camp','source'=>'test','employer'=>'Acme','employer_id'=>$employer->id,
+            'title'=>'AI Engineer','url'=>'https://example.test/jobs/1','discovered_at'=>now(),'match_score'=>90
+        ]);
+        $c=app(\App\Galika\Services\CampaignStrategyService::class)->plan($u->id,$o);
+        $this->assertSame('REFERRAL_FIRST',$c->strategy);
+    }
+
+    public function test_follow_up_pauses_for_soft_bounce_and_terminal_inbound(): void
+    {
+        $u=User::factory()->create();
+        $o=GalikaOpportunity::create(['canonical_key'=>'f','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://e.test','discovered_at'=>now()]);
+        $a=GalikaApplication::create(['user_id'=>$u->id,'opportunity_id'=>$o->id,'application_key'=>'f1','status'=>'SUBMITTED_CONFIRMED','delivery_state'=>'SENT_PENDING']);
+        $this->assertNull(app(\App\Galika\Services\CommunicationCadenceService::class)->next($a,0));
+        $a->update(['delivery_state'=>'DELIVERED_NO_BOUNCE','inbound_state'=>'INTERVIEW']);
+        $this->assertNull(app(\App\Galika\Services\CommunicationCadenceService::class)->next($a,0));
+    }
+
+    public function test_career_os_surfaces_are_user_accessible(): void
+    {
+        $u=User::factory()->create();
+        foreach(['/galika/campaigns','/galika/relationships','/galika/personas','/galika/interviews','/galika/offers','/galika/events'] as $url){
+            $this->actingAs($u)->get($url)->assertOk();
+        }
     }
 }
