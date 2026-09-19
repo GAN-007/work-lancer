@@ -89,13 +89,13 @@ class GalikaController extends Controller
     }
 
     public function oauthStart(Request $r,string $provider,OAuthService $oauth){
-        abort_unless(in_array($provider,['gmail'],true),404);
+        abort_unless(in_array($provider,['gmail','airtable','linkedin','lever'],true),404);
         return redirect()->away($oauth->authorizationUrl($r->user()->id,$provider));
     }
 
     public function oauthCallback(Request $r,string $provider,OAuthService $oauth){
         $r->validate(['code'=>'required|string','state'=>'required|string']);
-        $oauth->exchange($r->user()->id,$provider,$r->string('code'),$r->string('state'));
+        $oauth->exchange($r->user()->id,$provider,(string)$r->string('code'),(string)$r->string('state'));
         return redirect()->route('galika.connections')->with('success',ucfirst($provider).' connected.');
     }
 
