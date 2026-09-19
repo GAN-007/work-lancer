@@ -6,10 +6,11 @@ use RuntimeException;
 
 class GmailAdapter
 {
-    public function __construct(private ConnectionVault $vault){}
+    public function __construct(private ConnectionVault $vault,private OAuthService $oauth){}
 
     private function token(int $userId):string
     {
+        if($this->vault->expiring($userId,'gmail')) return $this->oauth->refresh($userId,'gmail');
         return $this->vault->credential($userId,'gmail','access_token');
     }
 
