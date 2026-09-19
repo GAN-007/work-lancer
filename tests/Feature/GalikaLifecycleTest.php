@@ -412,4 +412,73 @@ class GalikaLifecycleTest extends TestCase
         $this->assertDatabaseHas('galika_next_actions',['user_id'=>$u->id,'subject_type'=>'INTERVIEW','subject_id'=>$i->id]);
         $this->assertDatabaseHas('galika_next_actions',['user_id'=>$u->id,'subject_type'=>'OFFER','subject_id'=>$offer->id]);
     }
+
+
+    public function test_authoritative_reverification_closes_dead_role(): void
+    {
+        Http::fake(['https://jobs.example.test/closed'=>Http::response('This job is no longer available',200)]);
+        $o=GalikaOpportunity::create(['canonical_key'=>'dead','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://jobs.example.test/closed','discovered_at'=>now()]);
+        $r=app(\App\Galika\Services\AuthoritativeReverificationService::class)->verify($o);
+        $this->assertFalse($r['open']);
+        $this->assertFalse((bool)$o->fresh()->official_open);
+    }
+
+    public function test_deep_privacy_filters_nested_sensitive_fields(): void
+    {
+        $u=User::factory()->create();
+        $out=app(\App\Galika\Services\DeepPrivacyDisclosureService::class)->filter($u->id,[
+            'profile'=>['email'=>'x@example.com','passport'=>'SECRET','home_address'=>'Hidden'],
+            'evidence'=>[['fact'=>'Python','medical'=>'PRIVATE']]
+        ],'APPLICATION');
+        $this->assertSame('x@example.com',$out['profile']['email']);
+        $this->assertArrayNotHasKey('passport',$out['profile']);
+        $this->assertArrayNotHasKey('home_address',$out['profile']);
+        $this->assertArrayNotHasKey('medical',$out['evidence'][0]);
+    }
+
+    public function test_capacity_planner_blocks_when_weekly_interview_limit_reached(): void
+    {
+        $u=User::factory()->create();
+        GalikaProfile::create(['user_id'=>$u->id,'timezone'=>'UTC','max_interviews_per_week'=>1]);
+        $o=GalikaOpportunity::create(['canonical_key'=>'cap','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://e.test','discovered_at'=>now()]);
+        $a=GalikaApplication::create(['user_id'=>$u->id,'opportunity_id'=>$o->id,'application_key'=>'cap1','status'=>'SUBMITTED_CONFIRMED']);
+        \App\Models\GalikaInterview::create(['application_id'=>$a->id,'stage'=>'INTERVIEW','state'=>'SCHEDULED','starts_at'=>now()->addDay()]);
+        $r=app(\App\Galika\Services\CapacityPlannerService::class)->canPursue($u->id);
+        $this->assertFalse($r['ok']);
+        $this->assertSame('INTERVIEW_CAPACITY_REACHED',$r['reason']);
+    }
+
+    public function test_queue_orchestrator_enqueues_idempotent_apply_items(): void
+    {
+        $u=User::factory()->create();
+        GalikaProfile::create(['user_id'=>$u->id,'timezone'=>'UTC','autonomous_apply_enabled'=>true]);
+        GalikaOpportunity::create(['canonical_key'=>'q1','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://e.test/1','discovered_at'=>now()]);
+        $svc=app(\App\Galika\Services\QueueOrchestratorService::class);
+        $svc->enqueueApplications(10);$svc->enqueueApplications(10);
+        $this->assertSame(1,\DB::table('galika_execution_work_items')->where('kind','APPLY')->count());
+    }
+
+    public function test_marketplace_finance_schema_supports_contract_milestone_payment(): void
+    {
+        $employer=User::factory()->create();$freelancer=User::factory()->create();
+        $category=\App\Models\JobCategory::create(['category_name'=>'Engineering']);
+        $job=\App\Models\Job::create(['headline'=>'Build AI','title'=>'Build AI','job_id'=>'JOB-'.uniqid(),'category_id'=>$category->id,'user_id'=>$employer->id,'description'=>'AI build','skills'=>'PHP,AI','payment_category'=>'fixed','pay_rate'=>'1000','status'=>'active']);
+        $contract=\App\Models\Contract::create(['job_id'=>$job->id,'employer_id'=>$employer->id,'freelancer_id'=>$freelancer->id,'state'=>'ACTIVE','value'=>1000,'currency'=>'USD']);
+        $milestone=\App\Models\Milestone::create(['contract_id'=>$contract->id,'title'=>'Delivery','amount'=>1000]);
+        \App\Models\Payment::create(['contract_id'=>$contract->id,'milestone_id'=>$milestone->id,'payer_id'=>$employer->id,'payee_id'=>$freelancer->id,'amount'=>1000,'currency'=>'USD','state'=>'PENDING']);
+        $this->assertDatabaseHas('payments',['contract_id'=>$contract->id,'amount'=>1000,'state'=>'PENDING']);
+    }
+
+    public function test_pages_workflow_and_status_surface_exist(): void
+    {
+        $this->assertFileExists(base_path('.github/workflows/pages.yml'));
+        $this->assertFileExists(public_path('status/index.html'));
+    }
+
+    public function test_backup_health_snapshot_returns_database_metadata(): void
+    {
+        $r=app(\App\Galika\Services\BackupHealthService::class)->snapshot();
+        $this->assertArrayHasKey('database',$r);
+        $this->assertArrayHasKey('tables',$r);
+    }
 }

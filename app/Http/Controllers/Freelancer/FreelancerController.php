@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\JobCategory;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Payment;
 
 class FreelancerController extends Controller
 {
@@ -77,26 +78,19 @@ class FreelancerController extends Controller
     }
 
     public function allpayments(){
-        
-
-        return view('freelancer.payments.allpayments');
+        $payments=Payment::where('payee_id',auth()->id())->latest()->get();
+        return view('freelancer.payments.allpayments',compact('payments'));
     }
     public function completepayments(){
-        
-
-        return view('freelancer.payments.completepayments');
-
+        $payments=Payment::where('payee_id',auth()->id())->where('state','PAID')->latest()->get();
+        return view('freelancer.payments.completepayments',compact('payments'));
     }
     public function pendingpayments(){
-        
-
-        return view('freelancer.payments.pendingpayments');
-        
+        $payments=Payment::where('payee_id',auth()->id())->where('state','PENDING')->latest()->get();
+        return view('freelancer.payments.pendingpayments',compact('payments'));
     }
     public function disputedpayments(){
-        
-
-        return view('freelancer.payments.disputedpayments');
-        
+        $payments=Payment::where('payee_id',auth()->id())->where('state','DISPUTED')->latest()->get();
+        return view('freelancer.payments.disputedpayments',compact('payments'));
     }
 }

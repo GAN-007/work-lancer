@@ -6,7 +6,7 @@ use App\Models\GalikaWealthItem;
 
 class WealthExecutionService
 {
-    public function __construct(private GalikaIntelligenceService $ai){}
+    public function __construct(private GalikaIntelligenceService $ai,private WealthActionService $actions){}
 
     public function plan(GalikaWealthItem $item):GalikaWealthItem
     {
@@ -18,6 +18,8 @@ class WealthExecutionService
             'next_action_at'=>$plan['viable']&&!$plan['requires_human']?now():null,
             'last_error'=>null,
         ]);
-        return $item->refresh();
+        $item=$item->refresh();
+        if($item->state==='QUALIFIED'&&!data_get($item->execution_plan,'requires_human',true))$item=$this->actions->execute($item);
+        return $item;
     }
 }

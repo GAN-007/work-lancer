@@ -30,7 +30,10 @@ class ApplicationEngine
         private HumanAssistService $assist,
         private CampaignExecutionService $campaignExec,
         private SourceMetricService $sourceMetrics,
-        private EmployerMemoryService $employerMemory
+        private EmployerMemoryService $employerMemory,
+        private AuthoritativeReverificationService $reverify,
+        private CapacityPlannerService $capacity,
+        private DeepPrivacyDisclosureService $deepPrivacy
     ){}
 
     public function process(GalikaOpportunity $o,int $userId):GalikaApplication
@@ -50,6 +53,18 @@ class ApplicationEngine
 
         if($o->published_at&&$o->published_at->lt(now()->subDays(config('galika.max_age_days',30)))){
             $a->update(['status'=>'STALE','failure_class'=>'CLOSED']);
+            return $a;
+        }
+
+        $live=$this->reverify->verify($o);
+        if(!$live['open']){
+            $a->update(['status'=>'CLOSED','blocker'=>$live['reason'],'failure_class'=>'CLOSED']);
+            return $a;
+        }
+
+        $capacity=$this->capacity->canPursue($userId);
+        if(!$capacity['ok']){
+            $a->update(['status'=>'BLOCKED_REQUIRES_USER','blocker'=>$capacity['reason'],'conditional_state'=>'CAPACITY']);
             return $a;
         }
 
@@ -149,7 +164,7 @@ class ApplicationEngine
             $answers=GalikaApplicationAnswer::where('application_id',$a->id)->get()
                 ->mapWithKeys(fn($x)=>[$x->question=>$x->answer])->all();
 
-            $candidate=$this->privacy->filter($a->user_id,$candidate,'APPLICATION')+['profile'=>$candidate['profile']??[],'evidence'=>$candidate['evidence']??[]];
+            $candidate=$this->deepPrivacy->filter($a->user_id,$candidate,'APPLICATION');
             $data=$this->tinyfish->apply($a,$o,$candidate,$answers,$attachments);
 
             if(!($data['submitted']??false)||empty($data['confirmation'])){
