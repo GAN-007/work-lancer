@@ -34,7 +34,7 @@ class UserController extends Controller
                             ->where(['user_id'=>auth()->user()->id,'status'=>'complete'])
                             ->get();
         $tasksInProgress = Job::query()
-                            ->where(['user_id'=>auth()->user()->id,'status'=>'pending'])
+                            ->where(['user_id'=>auth()->user()->id,'status'=>'inprogress'])
                             ->get();
         $tasksInDrafts = Job::query()
                             ->where(['user_id'=>auth()->user()->id,'status'=>'draft'])
