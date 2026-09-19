@@ -20,10 +20,34 @@ class AirtableAdapter
         }
     }
 
+    public function bases(int $userId):array
+    {
+        $r=Http::withToken($this->token($userId))->timeout(30)->get('https://api.airtable.com/v0/meta/bases');
+        if(!$r->successful()) throw new RuntimeException('Airtable base discovery failed '.$r->status().': '.$r->body());
+        return $r->json('bases')??[];
+    }
+
+    public function selectedBase(int $userId):string
+    {
+        $connection=$this->vault->connection($userId,'airtable');
+        $base=data_get($connection->metadata,'base_id');
+        if(!$base) $base=config('services.airtable.base_id');
+        if(!$base) throw new RuntimeException('No Airtable base selected for this user');
+        return $base;
+    }
+
+    public function selectBase(int $userId,string $baseId,string $baseName):void
+    {
+        $connection=$this->vault->connection($userId,'airtable');
+        $meta=$connection->metadata??[];
+        $meta['base_id']=$baseId;
+        $meta['base_name']=$baseName;
+        $connection->update(['metadata'=>$meta]);
+    }
+
     public function upsert(int $userId,string $table,string $mergeField,array $fields):array
     {
-        $base=config('services.airtable.base_id');
-        if(!$base) throw new RuntimeException('AIRTABLE_BASE_ID missing');
+        $base=$this->selectedBase($userId);
 
         $r=Http::withToken($this->token($userId))->timeout(30)
             ->patch("https://api.airtable.com/v0/{$base}/".rawurlencode($table),[
@@ -37,12 +61,11 @@ class AirtableAdapter
 
     public function list(int $userId,string $table,array $params=[]):array
     {
-        $base=config('services.airtable.base_id');
-        if(!$base) throw new RuntimeException('AIRTABLE_BASE_ID missing');
+        $base=$this->selectedBase($userId);
 
         $r=Http::withToken($this->token($userId))->timeout(30)
             ->get("https://api.airtable.com/v0/{$base}/".rawurlencode($table),$params);
-        if(!$r->successful()) throw new RuntimeException('Airtable list failed '.$r->status());
+        if(!$r->successful()) throw new RuntimeException('Airtable list failed '.$r->status().': '.$r->body());
         return $r->json();
     }
 }

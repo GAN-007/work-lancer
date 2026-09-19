@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Galika\Services\CanaryService;
+use App\Galika\Services\AirtableAdapter;
 use App\Galika\Services\ConnectionHealthService;
 use App\Galika\Services\ConnectionVault;
 use App\Galika\Services\CvIngestionService;
@@ -73,8 +74,19 @@ class GalikaController extends Controller
         return redirect()->route('galika.profile')->with('success','Verified CV evidence added to your GALIKA profile.');
     }
 
-    public function connections(Request $r){
-        return view('galika.connections',['connections'=>GalikaConnection::where('user_id',$r->user()->id)->get()]);
+    public function connections(Request $r,AirtableAdapter $airtable){
+        $connections=GalikaConnection::where('user_id',$r->user()->id)->get();
+        $bases=[];$airtableError=null;
+        if($connections->firstWhere('provider','airtable')){
+            try{$bases=$airtable->bases($r->user()->id);}catch(\Throwable $e){$airtableError=$e->getMessage();}
+        }
+        return view('galika.connections',compact('connections','bases','airtableError'));
+    }
+
+    public function selectAirtableBase(Request $r,AirtableAdapter $airtable){
+        $data=$r->validate(['base_id'=>'required|string|regex:/^app[A-Za-z0-9]{14}$/','base_name'=>'required|string|max:255']);
+        $airtable->selectBase($r->user()->id,$data['base_id'],$data['base_name']);
+        return back()->with('success','Airtable base selected.');
     }
 
     public function saveApiConnection(Request $r,ConnectionVault $vault){
