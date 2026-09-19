@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 class RecruiterThreadService
 {
-    public function __construct(private GmailAdapter $gmail,private GalikaAIService $ai){}
+    public function __construct(private GmailAdapter $gmail,private GalikaIntelligenceService $ai){}
 
     public function scan(int $userId):int
     {
@@ -20,7 +20,7 @@ class RecruiterThreadService
             $apps=GalikaApplication::where('user_id',$userId)->where('status','SUBMITTED_CONFIRMED')->with('opportunity')->get()
                 ->filter(fn($a)=>$a->opportunity&&(str_contains($hay,mb_strtolower($a->opportunity->employer))||str_contains($hay,mb_strtolower($a->opportunity->title))));
             foreach($apps as $a){
-                $classified=$this->ai->classifyRecruiterMessage($a->opportunity->toArray(),$subject,$from,$body);
+                $classified=$this->ai->classifyRecruiter($userId,$a->opportunity->toArray(),$subject,$from,$body);
                 GalikaRecruiterThread::updateOrCreate(
                     ['user_id'=>$userId,'provider_thread_id'=>$m['threadId']??$row['id']],
                     [
@@ -40,7 +40,7 @@ class RecruiterThreadService
     {
         if($thread->requires_human) return ['sent'=>false,'reason'=>'HUMAN_REQUIRED'];
         $a=$thread->application()->with('opportunity')->first();
-        $draft=$this->ai->safeRecruiterReply($a->opportunity->toArray(),$thread->classification,$thread->last_message);
+        $draft=$this->ai->safeRecruiterReply($thread->user_id,$a->opportunity->toArray(),$thread->classification,$thread->last_message);
         if($draft['needs_user']) return ['sent'=>false,'reason'=>'HUMAN_REQUIRED'];
         $sent=$this->gmail->send($thread->user_id,$fromAddress,($thread->participants??[])[0]??'', 'Re: '.$a->opportunity->title,$draft['reply'],$thread->provider_thread_id);
         $thread->update(['state'=>'RESPONDED']);
