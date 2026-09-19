@@ -331,4 +331,85 @@ class GalikaLifecycleTest extends TestCase
             $this->actingAs($u)->get($url)->assertOk();
         }
     }
+
+
+    public function test_source_metrics_recompute_yield(): void
+    {
+        $m=app(\App\Galika\Services\SourceMetricService::class);
+        $m->bump('jobicy','discovered',10);
+        $m->bump('jobicy','submitted',5);
+        $m->bump('jobicy','response',2);
+        $m->bump('jobicy','interview',1);
+        $this->assertGreaterThan(0,\App\Models\GalikaSourceMetric::where('source','jobicy')->value('yield_score'));
+    }
+
+    public function test_campaign_materializes_executable_actions(): void
+    {
+        $u=User::factory()->create();
+        $e=\App\Models\GalikaEmployer::create(['canonical_name'=>'Acme']);
+        $p=\App\Models\GalikaPerson::create(['employer_id'=>$e->id,'name'=>'Jane','email'=>'jane@acme.test','relationship_type'=>'EMPLOYEE']);
+        \App\Models\GalikaRelationship::create(['user_id'=>$u->id,'person_id'=>$p->id,'strength'=>'STRONG']);
+        $o=GalikaOpportunity::create(['canonical_key'=>'exec','source'=>'test','employer'=>'Acme','employer_id'=>$e->id,'title'=>'AI Engineer','url'=>'https://e.test/job','discovered_at'=>now(),'match_score'=>90]);
+        $c=app(\App\Galika\Services\CampaignStrategyService::class)->plan($u->id,$o);
+        app(\App\Galika\Services\CampaignExecutionService::class)->materialize($c);
+        $this->assertDatabaseHas('galika_campaign_actions',['campaign_id'=>$c->id,'action'=>'REQUEST_REFERRAL','state'=>'PENDING']);
+    }
+
+    public function test_human_assist_is_created_for_auth_blocker(): void
+    {
+        $u=User::factory()->create();
+        $o=GalikaOpportunity::create(['canonical_key'=>'ha','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://e.test','discovered_at'=>now()]);
+        $a=GalikaApplication::create(['user_id'=>$u->id,'opportunity_id'=>$o->id,'application_key'=>'ha1','status'=>'BLOCKED_REQUIRES_USER']);
+        $h=app(\App\Galika\Services\HumanAssistService::class)->create($a,'AUTH','Re-authenticate',['url'=>'https://e.test']);
+        $this->assertSame('OPEN',$h->state);
+        $this->assertDatabaseHas('galika_human_assists',['application_id'=>$a->id,'kind'=>'AUTH','state'=>'OPEN']);
+    }
+
+    public function test_next_best_action_surfaces_application_blocker(): void
+    {
+        $u=User::factory()->create();
+        $o=GalikaOpportunity::create(['canonical_key'=>'nba','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://e.test','discovered_at'=>now()]);
+        $a=GalikaApplication::create(['user_id'=>$u->id,'opportunity_id'=>$o->id,'application_key'=>'nba1','status'=>'BLOCKED_REQUIRES_USER','blocker'=>'CAPTCHA']);
+        app(\App\Galika\Services\NextBestActionService::class)->refreshUser($u->id);
+        $this->assertDatabaseHas('galika_next_actions',['user_id'=>$u->id,'subject_type'=>'APPLICATION','subject_id'=>$a->id,'action'=>'RESOLVE_BLOCKER','priority'=>'HIGH']);
+    }
+
+    public function test_pipeline_canary_is_named_readiness_not_end_to_end(): void
+    {
+        $u=User::factory()->create();
+        GalikaProfile::create(['user_id'=>$u->id,'timezone'=>'UTC','autonomous_apply_enabled'=>true]);
+        $run=app(\App\Galika\Services\CanaryService::class)->run($u->id);
+        $this->assertSame('PIPELINE_READINESS',$run->scenario);
+    }
+
+    public function test_persona_selector_prefers_matching_role(): void
+    {
+        $u=User::factory()->create();
+        \App\Models\GalikaPersona::create(['user_id'=>$u->id,'name'=>'Data','target_roles'=>['Data Scientist'],'active'=>true,'performance_score'=>1]);
+        $expected=\App\Models\GalikaPersona::create(['user_id'=>$u->id,'name'=>'AI','target_roles'=>['AI Engineer'],'active'=>true,'performance_score'=>1]);
+        $o=new GalikaOpportunity(['title'=>'Senior AI Engineer']);
+        $selected=app(\App\Galika\Services\PersonaSelectionService::class)->select($u->id,$o);
+        $this->assertSame($expected->id,$selected->id);
+    }
+
+    public function test_privacy_service_blocks_sensitive_data_by_default(): void
+    {
+        $u=User::factory()->create();
+        $svc=app(\App\Galika\Services\PrivacyDisclosureService::class);
+        $this->assertFalse($svc->allowed($u->id,'passport','APPLICATION'));
+        $this->assertTrue($svc->allowed($u->id,'email','APPLICATION'));
+    }
+
+    public function test_interview_and_offer_orchestration_create_next_actions(): void
+    {
+        $u=User::factory()->create();
+        $o=GalikaOpportunity::create(['canonical_key'=>'io','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://e.test','discovered_at'=>now()]);
+        $a=GalikaApplication::create(['user_id'=>$u->id,'opportunity_id'=>$o->id,'application_key'=>'io1','status'=>'SUBMITTED_CONFIRMED']);
+        $i=\App\Models\GalikaInterview::create(['application_id'=>$a->id,'stage'=>'TECHNICAL','state'=>'INVITED']);
+        app(\App\Galika\Services\InterviewOrchestrationService::class)->prepare($i);
+        $offer=\App\Models\GalikaOffer::create(['application_id'=>$a->id,'state'=>'RECEIVED','currency'=>'USD']);
+        app(\App\Galika\Services\OfferOrchestrationService::class)->analyze($offer);
+        $this->assertDatabaseHas('galika_next_actions',['user_id'=>$u->id,'subject_type'=>'INTERVIEW','subject_id'=>$i->id]);
+        $this->assertDatabaseHas('galika_next_actions',['user_id'=>$u->id,'subject_type'=>'OFFER','subject_id'=>$offer->id]);
+    }
 }
