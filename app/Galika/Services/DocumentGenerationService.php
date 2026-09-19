@@ -8,12 +8,12 @@ use Illuminate\Support\Facades\Storage;
 
 class DocumentGenerationService
 {
-    public function __construct(private GalikaAIService $ai){}
+    public function __construct(private GalikaIntelligenceService $ai){}
 
     public function generateForOpportunity(int $userId,GalikaOpportunity $o):array
     {
         $evidence=GalikaEvidence::where('user_id',$userId)->where('verified',true)->get()->toArray();
-        $pack=$this->ai->generateApplicationPack($evidence,$o->toArray());
+        $pack=$this->ai->applicationPack($userId,$evidence,$o->toArray());
         $result=[];
 
         foreach(['resume'=>'RESUME','cover_letter'=>'COVER_LETTER'] as $key=>$kind){
