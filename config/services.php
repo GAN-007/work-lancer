@@ -5,7 +5,17 @@ return [
  'ses'=>['key'=>env('AWS_ACCESS_KEY_ID'),'secret'=>env('AWS_SECRET_ACCESS_KEY'),'region'=>env('AWS_DEFAULT_REGION','us-east-1')],
  'openai'=>['key'=>env('OPENAI_API_KEY')],
  'gmail'=>['access_token'=>env('GMAIL_ACCESS_TOKEN'),'from'=>env('GMAIL_FROM')],
+ 'oauth'=>[
+  'gmail'=>[
+   'client_id'=>env('GOOGLE_CLIENT_ID'),
+   'client_secret'=>env('GOOGLE_CLIENT_SECRET'),
+   'redirect_uri'=>env('GOOGLE_REDIRECT_URI'),
+   'authorize_url'=>'https://accounts.google.com/o/oauth2/v2/auth',
+   'token_url'=>'https://oauth2.googleapis.com/token',
+   'scopes'=>['openid','email','https://www.googleapis.com/auth/gmail.readonly','https://www.googleapis.com/auth/gmail.send'],
+  ],
+ ],
  'airtable'=>['token'=>env('AIRTABLE_TOKEN'),'base_id'=>env('AIRTABLE_BASE_ID')],
- 'tinyfish'=>['key'=>env('TINYFISH_API_KEY'),'endpoint'=>env('TINYFISH_ENDPOINT')],
+ 'tinyfish'=>['key'=>env('TINYFISH_API_KEY'),'endpoint'=>env('TINYFISH_ENDPOINT'),'health_endpoint'=>env('TINYFISH_HEALTH_ENDPOINT')],
  'jobicy'=>['endpoint'=>env('JOBICY_ENDPOINT','https://jobicy.com/api/v2/remote-jobs')],
 ];
