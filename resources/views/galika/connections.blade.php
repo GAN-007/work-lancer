@@ -29,6 +29,23 @@
         <button class="btn btn-outline-secondary btn-sm">Run health test</button>
       </form>
     @endif
+    @if($provider==='airtable' && $c)
+      @if($airtableError)
+        <div class="alert alert-warning mt-3 py-2 small">{{ $airtableError }}</div>
+      @elseif(count($bases))
+        <form method="post" action="{{ route('galika.connections.airtable.base') }}" class="mt-3">@csrf
+          <label class="form-label small">Airtable base</label>
+          <select class="form-select form-select-sm" name="base_id" onchange="this.form.base_name.value=this.options[this.selectedIndex].dataset.name">
+            <option value="">Choose a base</option>
+            @foreach($bases as $base)
+              <option value="{{ $base['id'] }}" data-name="{{ $base['name'] }}" @selected(data_get($c->metadata,'base_id')===$base['id'])>{{ $base['name'] }}</option>
+            @endforeach
+          </select>
+          <input type="hidden" name="base_name" value="{{ data_get($c->metadata,'base_name') }}">
+          <button class="btn btn-outline-primary btn-sm mt-2">Use this base</button>
+        </form>
+      @endif
+    @endif
   </div>
 </div>
 @endforeach
