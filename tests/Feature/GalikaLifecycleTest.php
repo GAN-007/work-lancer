@@ -461,7 +461,8 @@ class GalikaLifecycleTest extends TestCase
     public function test_marketplace_finance_schema_supports_contract_milestone_payment(): void
     {
         $employer=User::factory()->create();$freelancer=User::factory()->create();
-        $job=\App\Models\Job::create(['job_title'=>'Build AI','user_id'=>$employer->id,'status'=>'active']);
+        $category=\App\Models\JobCategory::create(['category_name'=>'Engineering']);
+        $job=\App\Models\Job::create(['headline'=>'Build AI','title'=>'Build AI','job_id'=>'JOB-'.uniqid(),'category_id'=>$category->id,'user_id'=>$employer->id,'description'=>'AI build','skills'=>'PHP,AI','payment_category'=>'fixed','pay_rate'=>'1000','status'=>'active']);
         $contract=\App\Models\Contract::create(['job_id'=>$job->id,'employer_id'=>$employer->id,'freelancer_id'=>$freelancer->id,'state'=>'ACTIVE','value'=>1000,'currency'=>'USD']);
         $milestone=\App\Models\Milestone::create(['contract_id'=>$contract->id,'title'=>'Delivery','amount'=>1000]);
         \App\Models\Payment::create(['contract_id'=>$contract->id,'milestone_id'=>$milestone->id,'payer_id'=>$employer->id,'payee_id'=>$freelancer->id,'amount'=>1000,'currency'=>'USD','state'=>'PENDING']);
