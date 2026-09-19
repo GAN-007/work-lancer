@@ -1,0 +1,4 @@
+<?php
+namespace Tests\Feature;
+use App\Models\GalikaApplication;use App\Models\GalikaOpportunity;use Illuminate\Foundation\Testing\RefreshDatabase;use Tests\TestCase;
+class GalikaLifecycleTest extends TestCase {use RefreshDatabase;public function test_canonical_opportunity_prevents_duplicate_application():void{$o=GalikaOpportunity::create(['canonical_key'=>'k','source'=>'test','employer'=>'Acme','title'=>'AI Engineer','url'=>'https://example.test/job/1','discovered_at'=>now()]);GalikaApplication::create(['opportunity_id'=>$o->id,'application_key'=>'a','status'=>'SUBMITTED_CONFIRMED']);$this->expectException(\Illuminate\Database\QueryException::class);GalikaApplication::create(['opportunity_id'=>$o->id,'application_key'=>'b','status'=>'DISCOVERED']);}public function test_material_decision_tables_migrate():void{$this->assertTrue(\Schema::hasTable('galika_decisions'));$this->assertTrue(\Schema::hasTable('galika_execution_work_items'));}}
