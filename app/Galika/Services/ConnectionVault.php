@@ -30,6 +30,17 @@ class ConnectionVault{
         if(!$raw)throw new RuntimeException("Missing {$field} for {$provider}");
         return Crypt::decryptString($raw);
     }
+    public function connection(int $userId,string $provider):GalikaConnection
+    {
+        return GalikaConnection::where(['user_id'=>$userId,'provider'=>$provider])->firstOrFail();
+    }
+
+    public function expiring(int $userId,string $provider,int $withinSeconds=120):bool
+    {
+        $row=$this->connection($userId,$provider);
+        return $row->expires_at? $row->expires_at->lte(now()->addSeconds($withinSeconds)) : false;
+    }
+
     public function markHealth(int $userId,string $provider,bool $ok,?string $error=null):void{
         GalikaConnection::where(['user_id'=>$userId,'provider'=>$provider])->update(['health'=>$ok?'HEALTHY':'UNHEALTHY','last_error'=>$error,'last_health_at'=>now()]);
     }
