@@ -754,3 +754,30 @@ Production use still requires the operator to configure the external service cre
 The project is built on Laravel and retains the repository's existing open-source framework licensing obligations.
 
 Project-specific licensing and commercial usage terms should be defined by the repository owner before public commercial distribution.
+
+
+## User-managed integrations
+
+Work-Lancer 2.0 now supports per-user credential and connection state rather than relying only on server-global provider credentials.
+
+- Gmail: OAuth 2.0 connection flow with user-scoped tokens
+- OpenAI: encrypted per-user API key storage
+- Airtable: encrypted per-user API token storage
+- TinyFish: encrypted per-user API key storage
+- Connection health testing from the GALIKA Connections screen
+
+## CV ingestion and evidence confirmation
+
+Users can upload PDF, DOCX, or TXT CVs. GALIKA extracts text, derives explicit evidence only, and presents extracted facts for confirmation. Only confirmed facts become verified evidence available to autonomous applications.
+
+## Recruiter inbox automation
+
+The inbound worker scans connected Gmail mailboxes, correlates recruiter/application messages to submitted applications, classifies acknowledgements, assessments, interviews, offers, rejections, information requests, and recruiter replies, and marks material responses for human intervention. Safe non-material replies can be generated and sent without inventing commitments.
+
+## Wealth engine
+
+The Wealth Engine provides non-job execution lanes for consulting, B2B, tenders, partnerships, products, IP, and other revenue opportunities. Wealth items are persisted, prioritized, analyzed, and progressed independently from job application throughput.
+
+## Production runtime
+
+The repository includes a Dockerfile, Supervisor configuration, Redis queue worker configuration, Laravel scheduler execution, and a Render deployment manifest. The production runtime launches both scheduler and queue workers and supports continuous GALIKA cycles.
