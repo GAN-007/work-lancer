@@ -1,0 +1,3 @@
+@extends('galika.layout')
+@section('title','GALIKA Decision Queue')
+@section('content')<h2>Decision Queue</h2>@forelse($decisions as $d)<div class="card p-4 mt-3"><div class="text-muted">{{ $d->application?->opportunity?->employer }} · {{ $d->application?->opportunity?->title }}</div><h5 class="mt-2">{{ $d->question }}</h5><form method="post" action="{{ route('galika.decisions.resolve',$d) }}">@csrf<textarea class="form-control" name="answer" rows="3" required>{{ old('answer',$d->answer) }}</textarea><button class="btn btn-primary mt-2">Resolve</button></form></div>@empty<div class="alert alert-success mt-3">No material decisions waiting.</div>@endforelse<div class="mt-3">{{ $decisions->links() }}</div>@endsection
