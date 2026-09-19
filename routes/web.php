@@ -24,6 +24,17 @@ Route::middleware('auth')->prefix('galika')->name('galika.')->group(function(){
     Route::get('/decisions',[GalikaController::class,'decisions'])->name('decisions');
     Route::post('/decisions/{decision}',[GalikaController::class,'resolveDecision'])->name('decisions.resolve');
     Route::get('/analytics',[GalikaController::class,'analytics'])->name('analytics');
+    Route::post('/profile/cv',[GalikaController::class,'uploadCv'])->name('cv.upload');
+    Route::get('/documents/{document}/review',[GalikaController::class,'reviewDocument'])->name('documents.review');
+    Route::post('/documents/{document}/confirm',[GalikaController::class,'confirmDocument'])->name('documents.confirm');
+    Route::get('/connections',[GalikaController::class,'connections'])->name('connections');
+    Route::post('/connections/api',[GalikaController::class,'saveApiConnection'])->name('connections.api');
+    Route::post('/connections/{provider}/test',[GalikaController::class,'testConnection'])->name('connections.test');
+    Route::get('/oauth/{provider}',[GalikaController::class,'oauthStart'])->name('oauth.start');
+    Route::get('/oauth/{provider}/callback',[GalikaController::class,'oauthCallback'])->name('oauth.callback');
+    Route::get('/wealth',[GalikaController::class,'wealth'])->name('wealth');
+    Route::post('/wealth',[GalikaController::class,'createWealth'])->name('wealth.create');
+    Route::post('/canary',[GalikaController::class,'canary'])->name('canary');
 });
 
 Route::middleware(['auth','role:superadmin'])->name('superadmin.')->prefix('superadmin')->group(function(){
