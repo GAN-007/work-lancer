@@ -174,4 +174,66 @@ class GalikaLifecycleTest extends TestCase
         $this->assertSame('PASSED',$run->state);
         $this->assertDatabaseHas('galika_canary_runs',['user_id'=>$u->id,'state'=>'PASSED']);
     }
+
+
+    public function test_supported_oauth_providers_build_authorization_redirects(): void
+    {
+        foreach([
+            'airtable'=>['https://airtable.com/oauth2/v1/authorize','https://airtable.com/oauth2/v1/token'],
+            'linkedin'=>['https://www.linkedin.com/oauth/v2/authorization','https://www.linkedin.com/oauth/v2/accessToken'],
+            'lever'=>['https://auth.lever.co/authorize','https://auth.lever.co/oauth/token'],
+        ] as $provider=>$urls){
+            config(["services.oauth.{$provider}"=>[
+                'client_id'=>'client-'.$provider,
+                'client_secret'=>'secret-'.$provider,
+                'redirect_uri'=>"http://localhost/galika/oauth/{$provider}/callback",
+                'authorize_url'=>$urls[0],
+                'token_url'=>$urls[1],
+                'scopes'=>['openid'],
+            ]]);
+            $u=User::factory()->create();
+            $response=$this->actingAs($u)->get("/galika/oauth/{$provider}");
+            $response->assertRedirect();
+            $this->assertStringContainsString(parse_url($urls[0],PHP_URL_HOST),$response->headers->get('Location'));
+            $this->assertNotNull(session("oauth_state_{$provider}"));
+        }
+    }
+
+    public function test_oauth_refresh_rotates_access_token_and_preserves_refresh_token_when_provider_omits_new_one(): void
+    {
+        $u=User::factory()->create();
+        config(['services.oauth.gmail'=>[
+            'client_id'=>'client','client_secret'=>'secret',
+            'redirect_uri'=>'http://localhost/galika/oauth/gmail/callback',
+            'authorize_url'=>'https://accounts.google.com/o/oauth2/v2/auth',
+            'token_url'=>'https://oauth2.googleapis.com/token',
+            'scopes'=>['openid','email'],
+        ]]);
+        $vault=app(\App\Galika\Services\ConnectionVault::class);
+        $vault->store($u->id,'gmail','oauth',[
+            'access_token'=>'old-access','refresh_token'=>'refresh-one','expires_at'=>now()->subMinute(),'scopes'=>['openid']
+        ]);
+
+        Http::fake([
+            'https://oauth2.googleapis.com/token'=>Http::response([
+                'access_token'=>'new-access','expires_in'=>3600,'scope'=>'openid email'
+            ],200),
+        ]);
+
+        $new=app(\App\Galika\Services\OAuthService::class)->refresh($u->id,'gmail');
+        $this->assertSame('new-access',$new);
+        $this->assertSame('refresh-one',$vault->credential($u->id,'gmail','refresh_token'));
+        $this->assertSame('new-access',$vault->credential($u->id,'gmail','access_token'));
+    }
+
+    public function test_connections_page_uses_connect_buttons_for_oauth_providers(): void
+    {
+        $u=User::factory()->create();
+        $this->actingAs($u)->get('/galika/connections')
+            ->assertOk()
+            ->assertSee('Connect Gmail')
+            ->assertSee('Connect Airtable')
+            ->assertSee('Connect Linkedin')
+            ->assertSee('Connect Lever');
+    }
 }
