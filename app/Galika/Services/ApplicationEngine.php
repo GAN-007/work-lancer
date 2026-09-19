@@ -24,7 +24,13 @@ class ApplicationEngine
         private OpportunityTrustService $trust,
         private LocationFeasibilityService $location,
         private CampaignStrategyService $campaigns,
-        private AnswerKnowledgeService $knowledge
+        private AnswerKnowledgeService $knowledge,
+        private PersonaSelectionService $personas,
+        private PrivacyDisclosureService $privacy,
+        private HumanAssistService $assist,
+        private CampaignExecutionService $campaignExec,
+        private SourceMetricService $sourceMetrics,
+        private EmployerMemoryService $employerMemory
     ){}
 
     public function process(GalikaOpportunity $o,int $userId):GalikaApplication
@@ -65,6 +71,8 @@ class ApplicationEngine
             return $a;
         }
 
+        $persona=$this->personas->select($userId,$o);
+        if($persona)$a->update(['persona_id'=>$persona->id]);
         $candidate=$this->candidate($userId,$profile);
         $analysis=$this->ai->analyze($candidate,$o->toArray());
         $o->update([
@@ -102,7 +110,8 @@ class ApplicationEngine
             return $a;
         }
 
-        $this->campaigns->plan($userId,$o);
+        $campaign=$this->campaigns->plan($userId,$o);
+        $this->campaignExec->materialize($campaign);
 
         if(!$this->circuit->available('tinyfish')){
             $a->update(['status'=>'FAILED_RETRYING','blocker'=>'RATE_LIMIT','failure_class'=>'RATE_LIMIT','next_retry_at'=>now()->addMinutes(10)]);
@@ -140,17 +149,21 @@ class ApplicationEngine
             $answers=GalikaApplicationAnswer::where('application_id',$a->id)->get()
                 ->mapWithKeys(fn($x)=>[$x->question=>$x->answer])->all();
 
+            $candidate=$this->privacy->filter($a->user_id,$candidate,'APPLICATION')+['profile'=>$candidate['profile']??[],'evidence'=>$candidate['evidence']??[]];
             $data=$this->tinyfish->apply($a,$o,$candidate,$answers,$attachments);
 
             if(!($data['submitted']??false)||empty($data['confirmation'])){
                 $failure=$data['failure_class']??'OTHER';
                 $a->update([
-                    'status'=>in_array($failure,['CAPTCHA','UNKNOWN_ANSWER','CV_UPLOAD'],true)?'BLOCKED_REQUIRES_USER':'FAILED_RETRYING',
+                    'status'=>in_array($failure,['CAPTCHA','UNKNOWN_ANSWER','CV_UPLOAD','AUTH','SESSION_EXPIRED'],true)?'BLOCKED_REQUIRES_USER':'FAILED_RETRYING',
                     'blocker'=>$failure,
                     'failure_class'=>$failure,
                     'submission_state_detail'=>$failure,
                     'next_retry_at'=>now()->addMinutes(5),
                 ]);
+                if(in_array($failure,['CAPTCHA','AUTH','SESSION_EXPIRED'],true)){
+                    $this->assist->create($a,$failure,'Complete the required authentication/challenge, then resume this application.',['url'=>$o->official_url?:$o->url]);
+                }
                 return $a;
             }
 
@@ -173,6 +186,8 @@ class ApplicationEngine
 
             $this->circuit->success('tinyfish');
             $this->followUp->schedule($a);
+            $this->sourceMetrics->bump($o->source,'submitted');
+            if($o->employer_id){$employer=\App\Models\GalikaEmployer::find($o->employer_id);if($employer)$this->employerMemory->refresh($a->user_id,$employer);}
             return $a->refresh();
         }catch(Throwable $e){
             $this->circuit->failure('tinyfish',$e->getMessage());
