@@ -26,7 +26,6 @@ use App\Models\GalikaOffer;
 use App\Models\GalikaEvent;
 use App\Models\GalikaPersona;
 use App\Models\GalikaHumanAssist;
-use App\Models\GalikaApplication;
 use Illuminate\Http\Request;
 
 class GalikaController extends Controller
