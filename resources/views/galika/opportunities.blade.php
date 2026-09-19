@@ -1,0 +1,3 @@
+@extends('galika.layout')
+@section('title','GALIKA Opportunity Inbox')
+@section('content')<h2>Opportunity Inbox</h2><div class="card p-3 mt-3"><div class="table-responsive"><table class="table"><thead><tr><th>Employer</th><th>Role</th><th>Location</th><th>Source</th><th>Score</th><th>Freshness</th></tr></thead><tbody>@foreach($opportunities as $o)<tr><td>{{ $o->employer }}</td><td><a href="{{ $o->official_url ?: $o->url }}" target="_blank">{{ $o->title }}</a></td><td>{{ $o->location }}</td><td>{{ $o->source }}</td><td>{{ $o->match_score }}</td><td>{{ optional($o->published_at)->diffForHumans() }}</td></tr>@endforeach</tbody></table></div>{{ $opportunities->links() }}</div>@endsection

@@ -1,0 +1,3 @@
+@extends('galika.layout')
+@section('title','GALIKA Application Ledger')
+@section('content')<h2>Application Ledger</h2><div class="card p-3 mt-3"><div class="table-responsive"><table class="table"><thead><tr><th>Employer</th><th>Role</th><th>Status</th><th>Failure</th><th>Delivery</th><th>Latency</th></tr></thead><tbody>@foreach($applications as $a)<tr><td>{{ $a->opportunity?->employer }}</td><td>{{ $a->opportunity?->title }}</td><td>{{ $a->status }}</td><td>{{ $a->failure_class }}</td><td>{{ $a->delivery_state }}</td><td>{{ $a->discovery_to_submit_sec ? $a->discovery_to_submit_sec.'s' : '—' }}</td></tr>@endforeach</tbody></table></div>{{ $applications->links() }}</div>@endsection

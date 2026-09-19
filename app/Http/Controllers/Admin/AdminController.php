@@ -108,7 +108,7 @@ class AdminController extends Controller
     public function jobsinprogress()
     {    
 
-        $jobsinprogress = Job::where('status', 'pending')
+        $jobsinprogress = Job::where('status', 'inprogress')
         ->get();
         return view('superadmin.jobs.tasksinprogress', compact('jobsinprogress'));
 

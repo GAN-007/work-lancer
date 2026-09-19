@@ -69,7 +69,7 @@ class FreelancerController extends Controller
 
     public function pendingjobs()
     {
-        $job  = Job::where(['freelancer_assigned_id'=>auth()->user()->id,'status'=>'complete'])->get();
+        $job  = Job::where(['freelancer_assigned_id'=>auth()->user()->id,'status'=>'assigned'])->get();
 
         
 
