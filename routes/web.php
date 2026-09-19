@@ -41,6 +41,8 @@ Route::middleware('auth')->prefix('galika')->name('galika.')->group(function(){
     Route::get('/offers',[GalikaController::class,'offers'])->name('offers');
     Route::get('/events',[GalikaController::class,'events'])->name('events');
     Route::get('/personas',[GalikaController::class,'personas'])->name('personas');
+    Route::post('/applications/{application}/withdraw',[GalikaController::class,'withdrawApplication'])->name('applications.withdraw');
+    Route::get('/assist/{token}/resume',[GalikaController::class,'resumeAssist'])->name('assist.resume');
     Route::post('/canary',[GalikaController::class,'canary'])->name('canary');
 });
 
