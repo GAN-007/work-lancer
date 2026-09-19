@@ -481,4 +481,66 @@ class GalikaLifecycleTest extends TestCase
         $this->assertArrayHasKey('database',$r);
         $this->assertArrayHasKey('tables',$r);
     }
+
+
+    public function test_greenhouse_and_lever_direct_discovery_are_supported(): void
+    {
+        config(['galika.discovery.greenhouse_boards'=>['acme'],'galika.discovery.lever_sites'=>['acme'],'galika.discovery.queries'=>[]]);
+        Http::fake([
+            'https://boards-api.greenhouse.io/v1/boards/acme/jobs*'=>Http::response(['jobs'=>[[
+                'id'=>123,'title'=>'AI Engineer','absolute_url'=>'https://boards.greenhouse.io/acme/jobs/123',
+                'location'=>['name'=>'Remote'],'content'=>'Build AI','updated_at'=>now()->toIso8601String()
+            ]]],200),
+            'https://api.lever.co/v0/postings/acme*'=>Http::response([[
+                'id'=>'lev1','text'=>'Data Scientist','hostedUrl'=>'https://jobs.lever.co/acme/lev1',
+                'categories'=>['location'=>'Remote'],'descriptionPlain'=>'Data work'
+            ]],200),
+        ]);
+        $count=app(\App\Galika\Services\SourceBrokerService::class)->discover();
+        $this->assertGreaterThanOrEqual(2,$count);
+        $this->assertDatabaseHas('galika_opportunities',['source'=>'greenhouse','requisition_id'=>'123']);
+        $this->assertDatabaseHas('galika_opportunities',['source'=>'lever','requisition_id'=>'lev1']);
+    }
+
+    public function test_role_lineage_records_versions(): void
+    {
+        $o=GalikaOpportunity::create(['canonical_key'=>'lin','source'=>'test','employer'=>'Acme','title'=>'AI Engineer','url'=>'https://e.test','discovered_at'=>now()]);
+        $svc=app(\App\Galika\Services\RoleLineageService::class);
+        $svc->observe($o,['title'=>'AI Engineer','location'=>'Remote','description'=>'v1']);
+        $svc->observe($o,['title'=>'AI Engineer','location'=>'Remote','description'=>'v2']);
+        $this->assertSame(2,\App\Models\GalikaRoleLineage::where('opportunity_id',$o->id)->count());
+    }
+
+    public function test_human_assist_can_resume_with_token(): void
+    {
+        $u=User::factory()->create();
+        $o=GalikaOpportunity::create(['canonical_key'=>'assist','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://e.test','discovered_at'=>now()]);
+        $a=GalikaApplication::create(['user_id'=>$u->id,'opportunity_id'=>$o->id,'application_key'=>'assist1','status'=>'BLOCKED_REQUIRES_USER','blocker'=>'AUTH']);
+        $assist=app(\App\Galika\Services\HumanAssistService::class)->create($a,'AUTH','Login');
+        $this->assertNotNull($assist->resume_token);
+        $this->actingAs($u)->get('/galika/assist/'.$assist->resume_token.'/resume')->assertRedirect(route('galika.applications'));
+        $this->assertSame('RESUMED',$assist->fresh()->state);
+        $this->assertSame('VERIFIED',$a->fresh()->status);
+    }
+
+    public function test_application_withdrawal_records_external_truth_event(): void
+    {
+        $u=User::factory()->create();
+        $o=GalikaOpportunity::create(['canonical_key'=>'w','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://e.test','discovered_at'=>now()]);
+        $a=GalikaApplication::create(['user_id'=>$u->id,'opportunity_id'=>$o->id,'application_key'=>'w1','status'=>'SUBMITTED_CONFIRMED']);
+        $this->actingAs($u)->post('/galika/applications/'.$a->id.'/withdraw',['reason'=>'Changed direction'])->assertRedirect();
+        $this->assertSame('WITHDRAWN',$a->fresh()->correction_state);
+        $this->assertDatabaseHas('galika_career_events',['user_id'=>$u->id,'subject_type'=>'APPLICATION','subject_id'=>$a->id,'event_type'=>'WITHDRAWN']);
+    }
+
+    public function test_durable_worker_supports_non_application_kinds(): void
+    {
+        $u=User::factory()->create();
+        $o=GalikaOpportunity::create(['canonical_key'=>'dw','source'=>'test','employer'=>'Acme','title'=>'AI','url'=>'https://e.test','discovered_at'=>now()]);
+        $a=GalikaApplication::create(['user_id'=>$u->id,'opportunity_id'=>$o->id,'application_key'=>'dw1','status'=>'SUBMITTED_CONFIRMED']);
+        $i=\App\Models\GalikaInterview::create(['application_id'=>$a->id,'stage'=>'INTERVIEW','state'=>'INVITED']);
+        app(\App\Galika\Services\WorkQueueService::class)->enqueue('INTERVIEW_PREP',['interview_id'=>$i->id],'ip-'.$i->id);
+        $this->artisan('galika:worker --limit=10')->assertExitCode(0);
+        $this->assertSame('READY',data_get($i->fresh()->prep_plan,'status'));
+    }
 }

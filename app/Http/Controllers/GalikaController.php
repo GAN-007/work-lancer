@@ -3,6 +3,8 @@ namespace App\Http\Controllers;
 
 use App\Galika\Services\CanaryService;
 use App\Galika\Services\AirtableAdapter;
+use App\Galika\Services\ApplicationCorrectionService;
+use App\Galika\Services\HumanAssistService;
 use App\Galika\Services\ConnectionHealthService;
 use App\Galika\Services\ConnectionVault;
 use App\Galika\Services\CvIngestionService;
@@ -23,6 +25,7 @@ use App\Models\GalikaInterview;
 use App\Models\GalikaOffer;
 use App\Models\GalikaEvent;
 use App\Models\GalikaPersona;
+use App\Models\GalikaHumanAssist;
 use Illuminate\Http\Request;
 
 class GalikaController extends Controller
@@ -144,6 +147,20 @@ class GalikaController extends Controller
     public function offers(Request $r){return view('galika.offers',['offers'=>GalikaOffer::whereHas('application',fn($q)=>$q->where('user_id',$r->user()->id))->with('application.opportunity')->orderByDesc('created_at')->paginate(30)]);}
     public function events(Request $r){return view('galika.events',['events'=>GalikaEvent::where('user_id',$r->user()->id)->orderBy('starts_at')->paginate(30)]);}
     public function personas(Request $r){return view('galika.personas',['personas'=>GalikaPersona::where('user_id',$r->user()->id)->orderByDesc('active')->paginate(30)]);}
+
+    public function withdrawApplication(Request $r,GalikaApplication $application,ApplicationCorrectionService $corrections){
+        abort_unless($application->user_id===$r->user()->id,403);
+        $data=$r->validate(['reason'=>'nullable|string|max:1000']);
+        $corrections->withdraw($application,$data['reason']??'USER_REQUEST');
+        return back()->with('success','Application marked withdrawn.');
+    }
+
+    public function resumeAssist(Request $r,string $token,HumanAssistService $assists){
+        $assist=GalikaHumanAssist::where('user_id',$r->user()->id)->where('resume_token',$token)->firstOrFail();
+        $assists->resume($assist);
+        if($assist->application_id)GalikaApplication::whereKey($assist->application_id)->update(['status'=>'VERIFIED','blocker'=>null,'failure_class'=>null]);
+        return redirect()->route('galika.applications')->with('success','Human-assist step resumed. The application can continue on the next worker cycle.');
+    }
 
     public function canary(Request $r,CanaryService $canary){
         $run=$canary->run($r->user()->id);
