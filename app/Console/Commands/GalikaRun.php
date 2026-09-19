@@ -1,0 +1,4 @@
+<?php
+namespace App\Console\Commands;
+use App\Galika\Services\ApplicationEngine;use App\Galika\Services\DiscoveryService;use App\Models\GalikaOpportunity;use Illuminate\Console\Command;use Throwable;
+class GalikaRun extends Command {protected $signature='galika:run {--limit=25}';protected $description='Discover, verify and execute eligible GALIKA opportunities';public function handle(DiscoveryService $d,ApplicationEngine $e):int{$n=$d->discover();$this->info("Discovered {$n} new opportunities");GalikaOpportunity::whereDoesntHave('application',fn($q)=>$q->whereIn('status',['SUBMITTED_CONFIRMED','DUPLICATE','INELIGIBLE','STALE','CLOSED']))->orderByDesc('discovered_at')->limit((int)$this->option('limit'))->each(function($o)use($e){try{$a=$e->process($o);$this->line("{$o->employer} | {$o->title} => {$a->status}");}catch(Throwable $x){report($x);$this->error($x->getMessage());}});return self::SUCCESS;}}
