@@ -30,6 +30,7 @@ Route::middleware('auth')->prefix('galika')->name('galika.')->group(function(){
     Route::get('/connections',[GalikaController::class,'connections'])->name('connections');
     Route::post('/connections/api',[GalikaController::class,'saveApiConnection'])->name('connections.api');
     Route::post('/connections/{provider}/test',[GalikaController::class,'testConnection'])->name('connections.test');
+    Route::post('/connections/airtable/base',[GalikaController::class,'selectAirtableBase'])->name('connections.airtable.base');
     Route::get('/oauth/{provider}',[GalikaController::class,'oauthStart'])->name('oauth.start');
     Route::get('/oauth/{provider}/callback',[GalikaController::class,'oauthCallback'])->name('oauth.callback');
     Route::get('/wealth',[GalikaController::class,'wealth'])->name('wealth');
