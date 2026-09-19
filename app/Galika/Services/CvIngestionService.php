@@ -8,7 +8,7 @@ use RuntimeException;
 
 class CvIngestionService
 {
-    public function __construct(private GalikaAIService $ai){}
+    public function __construct(private GalikaIntelligenceService $ai){}
 
     public function ingest(int $userId,UploadedFile $file):GalikaDocument
     {
@@ -21,7 +21,7 @@ class CvIngestionService
         $sha=hash('sha256',$bytes);
         $path=$file->storeAs("galika/{$userId}/documents",$sha.'-'.$file->getClientOriginalName(),'local');
         $text=$this->extract($file->getRealPath(),$mime);
-        $facts=$this->ai->extractEvidence($text);
+        $facts=$this->ai->extractCvEvidence($userId,$text);
 
         return GalikaDocument::create([
             'user_id'=>$userId,'kind'=>'CV','disk'=>'local','path'=>$path,
