@@ -18,6 +18,12 @@
 <a href="{{ route('galika.analytics') }}">Analytics</a>
 <a href="{{ route('galika.connections') }}">Connections</a>
 <a href="{{ route('galika.wealth') }}">Wealth Engine</a>
+<a href="{{ route('galika.campaigns') }}">Campaigns</a>
+<a href="{{ route('galika.relationships') }}">Relationships</a>
+<a href="{{ route('galika.personas') }}">Career Personas</a>
+<a href="{{ route('galika.interviews') }}">Interviews</a>
+<a href="{{ route('galika.offers') }}">Offers</a>
+<a href="{{ route('galika.events') }}">Events</a>
 <hr class="border-secondary"><a href="{{ url('/') }}">Work-Lancer</a>
 </aside>
 <main class="col-12 col-md-9 col-lg-10 p-3 p-md-4">@if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif @yield('content')</main>

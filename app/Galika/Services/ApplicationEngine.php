@@ -20,7 +20,11 @@ class ApplicationEngine
         private TinyFishAdapter $tinyfish,
         private FollowUpService $followUp,
         private DocumentGenerationService $documents,
-        private AtsRouter $ats
+        private AtsRouter $ats,
+        private OpportunityTrustService $trust,
+        private LocationFeasibilityService $location,
+        private CampaignStrategyService $campaigns,
+        private AnswerKnowledgeService $knowledge
     ){}
 
     public function process(GalikaOpportunity $o,int $userId):GalikaApplication
@@ -43,6 +47,18 @@ class ApplicationEngine
             return $a;
         }
 
+        $trust=$this->trust->assess($o);
+        if($trust['state']==='HIGH_RISK'){
+            $a->update(['status'=>'BLOCKED_REQUIRES_USER','blocker'=>'TRUST_REVIEW','failure_class'=>'OTHER']);
+            return $a;
+        }
+
+        $geo=$this->location->evaluate($userId,$o->toArray());
+        if(!$geo['feasible']){
+            $a->update(['status'=>'BLOCKED_REQUIRES_USER','blocker'=>$geo['reason'],'failure_class'=>'LOCATION']);
+            return $a;
+        }
+
         $policy=$this->policies->evaluate($userId,$o->toArray());
         if(!$policy['allowed']){
             $a->update(['status'=>'INELIGIBLE','blocker'=>$policy['reason']]);
@@ -53,9 +69,11 @@ class ApplicationEngine
         $analysis=$this->ai->analyze($candidate,$o->toArray());
         $o->update([
             'verified_at'=>now(),
+            'reverified_at'=>now(),
             'eligibility'=>$analysis['eligible']?'ELIGIBLE':'INELIGIBLE',
             'match_score'=>$analysis['score'],
-            'evidence'=>array_merge($o->evidence??[],['qualification'=>$analysis]),
+            'expected_value'=>((float)$analysis['score'])/100,
+            'evidence'=>array_merge($o->evidence??[],['qualification'=>$analysis,'location'=>$geo]),
         ]);
 
         if(!$analysis['eligible']||$analysis['score']<$profile->minimum_match_score){
@@ -63,16 +81,28 @@ class ApplicationEngine
             return $a;
         }
 
-        if($analysis['unknown_material_questions']){
-            foreach($analysis['unknown_material_questions'] as $q){
+        $unresolved=[];
+        foreach($analysis['unknown_material_questions'] as $q){
+            $known=$this->knowledge->answer($userId,$q);
+            if($known!==null){
+                GalikaApplicationAnswer::updateOrCreate(
+                    ['application_id'=>$a->id,'question'=>$q],
+                    ['answer'=>$known,'source_basis'=>'ANSWER_KNOWLEDGE','humanized'=>$known,'submitted'=>false]
+                );
+            }else{
+                $unresolved[]=$q;
                 GalikaDecision::firstOrCreate(
                     ['application_id'=>$a->id,'decision_type'=>'MATERIAL_ANSWER','question'=>$q],
-                    ['context'=>['opportunity'=>$o->url],'status'=>'OPEN']
+                    ['context'=>['opportunity'=>$o->url,'intent'=>$this->knowledge->intent($q)],'status'=>'OPEN']
                 );
             }
+        }
+        if($unresolved){
             $a->update(['status'=>'BLOCKED_REQUIRES_USER','blocker'=>'UNKNOWN_ANSWER','failure_class'=>'UNKNOWN_ANSWER']);
             return $a;
         }
+
+        $this->campaigns->plan($userId,$o);
 
         if(!$this->circuit->available('tinyfish')){
             $a->update(['status'=>'FAILED_RETRYING','blocker'=>'RATE_LIMIT','failure_class'=>'RATE_LIMIT','next_retry_at'=>now()->addMinutes(10)]);
@@ -84,6 +114,7 @@ class ApplicationEngine
             'started_at'=>$a->started_at?:now(),
             'ats_type'=>$this->ats->detect($o),
             'ats_requisition_id'=>$o->requisition_id,
+            'submission_state_detail'=>'READY_TO_SUBMIT'
         ]);
 
         return $this->submit($a,$o,$candidate);
@@ -97,7 +128,7 @@ class ApplicationEngine
         }
 
         $a->increment('attempt_count');
-        $a->update(['status'=>'SUBMITTING']);
+        $a->update(['status'=>'SUBMITTING','submission_state_detail'=>'SUBMISSION_ATTEMPTED']);
 
         try{
             $pack=$this->documents->generateForOpportunity($a->user_id,$o);
@@ -117,6 +148,7 @@ class ApplicationEngine
                     'status'=>in_array($failure,['CAPTCHA','UNKNOWN_ANSWER','CV_UPLOAD'],true)?'BLOCKED_REQUIRES_USER':'FAILED_RETRYING',
                     'blocker'=>$failure,
                     'failure_class'=>$failure,
+                    'submission_state_detail'=>$failure,
                     'next_retry_at'=>now()->addMinutes(5),
                 ]);
                 return $a;
@@ -130,6 +162,7 @@ class ApplicationEngine
                     'confirmation_at'=>now(),
                     'confirmation_id'=>$data['confirmation_id']??null,
                     'submission_proof'=>json_encode($data['confirmation']),
+                    'submission_state_detail'=>'CONFIRMATION_RENDERED',
                     'discovery_to_submit_sec'=>max(0,now()->diffInSeconds($o->discovered_at)),
                     'failure_class'=>null,
                     'next_retry_at'=>null,
@@ -147,6 +180,7 @@ class ApplicationEngine
                 'status'=>'FAILED_RETRYING',
                 'blocker'=>'SITE_ERROR',
                 'failure_class'=>'SITE_ERROR',
+                'submission_state_detail'=>'SITE_ERROR',
                 'next_retry_at'=>now()->addMinutes(min(60,2**min(6,$a->attempt_count))),
             ]);
             report($e);

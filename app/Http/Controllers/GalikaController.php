@@ -7,6 +7,7 @@ use App\Galika\Services\ConnectionHealthService;
 use App\Galika\Services\ConnectionVault;
 use App\Galika\Services\CvIngestionService;
 use App\Galika\Services\OAuthService;
+use App\Galika\Services\AnswerKnowledgeService;
 use App\Models\GalikaApplication;
 use App\Models\GalikaConnection;
 use App\Models\GalikaDecision;
@@ -16,6 +17,12 @@ use App\Models\GalikaIntegration;
 use App\Models\GalikaOpportunity;
 use App\Models\GalikaProfile;
 use App\Models\GalikaWealthItem;
+use App\Models\GalikaCampaign;
+use App\Models\GalikaRelationship;
+use App\Models\GalikaInterview;
+use App\Models\GalikaOffer;
+use App\Models\GalikaEvent;
+use App\Models\GalikaPersona;
 use Illuminate\Http\Request;
 
 class GalikaController extends Controller
@@ -114,7 +121,14 @@ class GalikaController extends Controller
     public function opportunities(){return view('galika.opportunities',['opportunities'=>GalikaOpportunity::orderByDesc('discovered_at')->paginate(30)]);}
     public function applications(Request $r){return view('galika.applications',['applications'=>GalikaApplication::where('user_id',$r->user()->id)->with('opportunity')->orderByDesc('created_at')->paginate(30)]);}
     public function decisions(Request $r){return view('galika.decisions',['decisions'=>GalikaDecision::whereHas('application',fn($q)=>$q->where('user_id',$r->user()->id))->with('application.opportunity')->orderByDesc('created_at')->paginate(30)]);}
-    public function resolveDecision(Request $r,GalikaDecision $decision){abort_unless($decision->application?->user_id===$r->user()->id,403);$data=$r->validate(['answer'=>'required|string|max:5000']);$decision->update(['answer'=>$data['answer'],'status'=>'RESOLVED','resolved_at'=>now()]);$decision->application->update(['status'=>'VERIFIED','blocker'=>null,'failure_class'=>null]);return back()->with('success','Decision resolved.');}
+    public function resolveDecision(Request $r,GalikaDecision $decision,AnswerKnowledgeService $knowledge){
+        abort_unless($decision->application?->user_id===$r->user()->id,403);
+        $data=$r->validate(['answer'=>'required|string|max:5000']);
+        $decision->update(['answer'=>$data['answer'],'status'=>'RESOLVED','resolved_at'=>now()]);
+        $knowledge->remember($r->user()->id,$decision->question,$data['answer'],true,['decision_id'=>$decision->id,'application_id'=>$decision->application_id]);
+        $decision->application->update(['status'=>'VERIFIED','blocker'=>null,'failure_class'=>null]);
+        return back()->with('success','Decision resolved and reusable knowledge saved.');
+    }
     public function analytics(Request $r){$uid=$r->user()->id;$q=GalikaApplication::where('user_id',$uid);$total=(clone $q)->count();$submitted=(clone $q)->where('status','SUBMITTED_CONFIRMED')->count();$interviews=(clone $q)->where('inbound_state','INTERVIEW')->count();$offers=(clone $q)->where('inbound_state','OFFER')->count();$avg=(clone $q)->whereNotNull('discovery_to_submit_sec')->avg('discovery_to_submit_sec');return view('galika.analytics',compact('total','submitted','interviews','offers','avg'));}
 
     public function wealth(Request $r){return view('galika.wealth',['items'=>GalikaWealthItem::where('user_id',$r->user()->id)->orderBy('priority')->paginate(30)]);}
@@ -123,6 +137,13 @@ class GalikaController extends Controller
         GalikaWealthItem::create($data+['user_id'=>$r->user()->id,'state'=>'DISCOVERED']);
         return back()->with('success','Wealth opportunity queued for GALIKA.');
     }
+
+    public function campaigns(Request $r){return view('galika.campaigns',['campaigns'=>GalikaCampaign::where('user_id',$r->user()->id)->orderByDesc('updated_at')->paginate(30)]);}
+    public function relationships(Request $r){return view('galika.relationships',['relationships'=>GalikaRelationship::where('user_id',$r->user()->id)->with('person.employer')->orderByDesc('updated_at')->paginate(30)]);}
+    public function interviews(Request $r){return view('galika.interviews',['interviews'=>GalikaInterview::whereHas('application',fn($q)=>$q->where('user_id',$r->user()->id))->with('application.opportunity')->orderByDesc('starts_at')->paginate(30)]);}
+    public function offers(Request $r){return view('galika.offers',['offers'=>GalikaOffer::whereHas('application',fn($q)=>$q->where('user_id',$r->user()->id))->with('application.opportunity')->orderByDesc('created_at')->paginate(30)]);}
+    public function events(Request $r){return view('galika.events',['events'=>GalikaEvent::where('user_id',$r->user()->id)->orderBy('starts_at')->paginate(30)]);}
+    public function personas(Request $r){return view('galika.personas',['personas'=>GalikaPersona::where('user_id',$r->user()->id)->orderByDesc('active')->paginate(30)]);}
 
     public function canary(Request $r,CanaryService $canary){
         $run=$canary->run($r->user()->id);

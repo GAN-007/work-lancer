@@ -35,6 +35,12 @@ Route::middleware('auth')->prefix('galika')->name('galika.')->group(function(){
     Route::get('/oauth/{provider}/callback',[GalikaController::class,'oauthCallback'])->name('oauth.callback');
     Route::get('/wealth',[GalikaController::class,'wealth'])->name('wealth');
     Route::post('/wealth',[GalikaController::class,'createWealth'])->name('wealth.create');
+    Route::get('/campaigns',[GalikaController::class,'campaigns'])->name('campaigns');
+    Route::get('/relationships',[GalikaController::class,'relationships'])->name('relationships');
+    Route::get('/interviews',[GalikaController::class,'interviews'])->name('interviews');
+    Route::get('/offers',[GalikaController::class,'offers'])->name('offers');
+    Route::get('/events',[GalikaController::class,'events'])->name('events');
+    Route::get('/personas',[GalikaController::class,'personas'])->name('personas');
     Route::post('/canary',[GalikaController::class,'canary'])->name('canary');
 });
 
