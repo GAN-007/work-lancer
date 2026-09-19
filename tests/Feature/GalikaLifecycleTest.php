@@ -99,4 +99,79 @@ class GalikaLifecycleTest extends TestCase
         GalikaEmailRoute::create(['user_id'=>$u->id,'employer'=>'Acme','email'=>'jobs@acme.test','domain'=>'acme.test','state'=>'HARD_BOUNCED','do_not_retry'=>true]);
         $this->assertDatabaseHas('galika_email_routes',['email'=>'jobs@acme.test','do_not_retry'=>1,'state'=>'HARD_BOUNCED']);
     }
+
+
+    public function test_user_can_store_encrypted_api_connection(): void
+    {
+        $u=User::factory()->create();
+        $vault=app(\App\Galika\Services\ConnectionVault::class);
+        $vault->store($u->id,'openai','api_key',['api_key'=>'sk-test-secret']);
+        $this->assertDatabaseHas('galika_connections',['user_id'=>$u->id,'provider'=>'openai','auth_type'=>'api_key']);
+        $raw=\DB::table('galika_connections')->where('user_id',$u->id)->where('provider','openai')->value('api_key');
+        $this->assertNotSame('sk-test-secret',$raw);
+        $this->assertSame('sk-test-secret',$vault->credential($u->id,'openai','api_key'));
+    }
+
+    public function test_gmail_oauth_start_redirects_with_state(): void
+    {
+        config([
+            'services.oauth.gmail'=>[
+                'client_id'=>'client',
+                'client_secret'=>'secret',
+                'redirect_uri'=>'http://localhost/galika/oauth/gmail/callback',
+                'authorize_url'=>'https://accounts.google.com/o/oauth2/v2/auth',
+                'token_url'=>'https://oauth2.googleapis.com/token',
+                'scopes'=>['openid','email'],
+            ]
+        ]);
+        $u=User::factory()->create();
+        $response=$this->actingAs($u)->get('/galika/oauth/gmail');
+        $response->assertRedirect();
+        $this->assertStringContainsString('accounts.google.com', $response->headers->get('Location'));
+        $this->assertNotNull(session('oauth_state_gmail'));
+    }
+
+    public function test_cv_confirmation_promotes_only_selected_facts(): void
+    {
+        $u=User::factory()->create();
+        $doc=\App\Models\GalikaDocument::create([
+            'user_id'=>$u->id,'kind'=>'CV','disk'=>'local','path'=>'x','original_name'=>'cv.txt','mime'=>'text/plain',
+            'size'=>10,'sha256'=>str_repeat('a',64),'extracted_text'=>'text',
+            'extracted_facts'=>[
+                ['domain'=>'SKILL','fact'=>'Python','confidence'=>0.99,'tags'=>['python']],
+                ['domain'=>'SKILL','fact'=>'Rust','confidence'=>0.50,'tags'=>['rust']],
+            ],'confirmed'=>false
+        ]);
+        app(\App\Galika\Services\CvIngestionService::class)->confirm($doc,[0]);
+        $this->assertDatabaseHas('galika_evidence',['user_id'=>$u->id,'fact'=>'Python','verified'=>1]);
+        $this->assertDatabaseMissing('galika_evidence',['user_id'=>$u->id,'fact'=>'Rust']);
+    }
+
+    public function test_ats_router_detects_supported_platforms(): void
+    {
+        $router=app(\App\Galika\Services\AtsRouter::class);
+        $o=new GalikaOpportunity(['url'=>'https://boards.greenhouse.io/acme/jobs/1']);$this->assertSame('GREENHOUSE',$router->detect($o));
+        $o=new GalikaOpportunity(['url'=>'https://jobs.lever.co/acme/1']);$this->assertSame('LEVER',$router->detect($o));
+        $o=new GalikaOpportunity(['url'=>'https://acme.wd5.myworkdayjobs.com/job']);$this->assertSame('WORKDAY',$router->detect($o));
+        $o=new GalikaOpportunity(['url'=>'https://www.linkedin.com/jobs/view/1']);$this->assertSame('LINKEDIN',$router->detect($o));
+        $o=new GalikaOpportunity(['url'=>'https://jobs.acme.test/apply']);$this->assertSame('GENERIC',$router->detect($o));
+    }
+
+    public function test_wealth_item_can_be_created_from_ui(): void
+    {
+        $u=User::factory()->create();
+        $this->actingAs($u)->post('/galika/wealth',[
+            'lane'=>'CONSULTING','title'=>'AI analytics project','counterparty'=>'Acme','currency'=>'KES'
+        ])->assertRedirect();
+        $this->assertDatabaseHas('galika_wealth_items',['user_id'=>$u->id,'lane'=>'CONSULTING','title'=>'AI analytics project','state'=>'DISCOVERED']);
+    }
+
+    public function test_canary_records_configured_user_readiness(): void
+    {
+        $u=User::factory()->create();
+        GalikaProfile::create(['user_id'=>$u->id,'timezone'=>'UTC','autonomous_apply_enabled'=>true]);
+        $run=app(\App\Galika\Services\CanaryService::class)->run($u->id);
+        $this->assertSame('PASSED',$run->state);
+        $this->assertDatabaseHas('galika_canary_runs',['user_id'=>$u->id,'state'=>'PASSED']);
+    }
 }

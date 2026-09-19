@@ -16,6 +16,8 @@
 <a href="{{ route('galika.applications') }}">Application Ledger</a>
 <a href="{{ route('galika.decisions') }}">Decision Queue</a>
 <a href="{{ route('galika.analytics') }}">Analytics</a>
+<a href="{{ route('galika.connections') }}">Connections</a>
+<a href="{{ route('galika.wealth') }}">Wealth Engine</a>
 <hr class="border-secondary"><a href="{{ url('/') }}">Work-Lancer</a>
 </aside>
 <main class="col-12 col-md-9 col-lg-10 p-3 p-md-4">@if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif @yield('content')</main>
