@@ -236,4 +236,33 @@ class GalikaLifecycleTest extends TestCase
             ->assertSee('Connect Linkedin')
             ->assertSee('Connect Lever');
     }
+
+
+    public function test_connected_airtable_user_can_discover_and_select_base(): void
+    {
+        $u=User::factory()->create();
+        $vault=app(\App\Galika\Services\ConnectionVault::class);
+        $vault->store($u->id,'airtable','oauth',[
+            'access_token'=>'air-access','refresh_token'=>'air-refresh','expires_at'=>now()->addHour(),'scopes'=>['schema.bases:read']
+        ]);
+
+        Http::fake([
+            'https://api.airtable.com/v0/meta/bases'=>Http::response([
+                'bases'=>[['id'=>'appeiqT7XOsucMMOX','name'=>'GAN Wealth OS','permissionLevel'=>'create']]
+            ],200),
+        ]);
+
+        $this->actingAs($u)->get('/galika/connections')
+            ->assertOk()
+            ->assertSee('GAN Wealth OS');
+
+        $this->actingAs($u)->post('/galika/connections/airtable/base',[
+            'base_id'=>'appeiqT7XOsucMMOX',
+            'base_name'=>'GAN Wealth OS',
+        ])->assertRedirect();
+
+        $connection=\App\Models\GalikaConnection::where('user_id',$u->id)->where('provider','airtable')->firstOrFail();
+        $this->assertSame('appeiqT7XOsucMMOX',data_get($connection->metadata,'base_id'));
+        $this->assertSame('GAN Wealth OS',data_get($connection->metadata,'base_name'));
+    }
 }
