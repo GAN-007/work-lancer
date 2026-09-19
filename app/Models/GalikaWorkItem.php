@@ -23,4 +23,9 @@ class GalikaWorkItem extends Model
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
+
+    public function opportunity()
+    {
+        return $this->belongsTo(GalikaOpportunity::class, 'opportunity_id');
+    }
 }
