@@ -13,7 +13,10 @@ class RecruiterThreadService
     public function __construct(
         private GmailAdapter $gmail,
         private GalikaIntelligenceService $ai,
-        private OutcomeLearningService $learning
+        private OutcomeLearningService $learning,
+        private InterviewOrchestrationService $interviews,
+        private OfferOrchestrationService $offers,
+        private AdaptiveLearningService $adaptive
     ){}
 
     public function scan(int $userId):int
@@ -47,15 +50,21 @@ class RecruiterThreadService
                 $a->update(['recruiter_thread_state'=>$classified['classification'],'last_inbound_at'=>now(),'inbound_state'=>$classified['classification']]);
 
                 if($classified['classification']==='INTERVIEW'){
-                    GalikaInterview::firstOrCreate(['application_id'=>$a->id,'stage'=>'INTERVIEW'],['state'=>'INVITED','timezone'=>null,'prep_plan'=>['status'=>'PENDING']]);
+                    $interview=GalikaInterview::firstOrCreate(['application_id'=>$a->id,'stage'=>'INTERVIEW'],['state'=>'INVITED','timezone'=>null,'prep_plan'=>['status'=>'PENDING']]);
+                    $this->interviews->prepare($interview);
                     $this->learning->record($a,'INTERVIEW','INTERVIEW','RECRUITER_INVITE',['thread'=>$thread->provider_thread_id]);
+                    $this->adaptive->updateForApplication($a,'interview');
                 }elseif($classified['classification']==='OFFER'){
-                    GalikaOffer::firstOrCreate(['application_id'=>$a->id],['state'=>'RECEIVED','analysis'=>['status'=>'PENDING']]);
+                    $offer=GalikaOffer::firstOrCreate(['application_id'=>$a->id],['state'=>'RECEIVED','analysis'=>['status'=>'PENDING']]);
+                    $this->offers->analyze($offer);
                     $this->learning->record($a,'OFFER','OFFER','RECRUITER_OFFER',['thread'=>$thread->provider_thread_id]);
+                    $this->adaptive->updateForApplication($a,'offer');
                 }elseif($classified['classification']==='REJECTION'){
                     $this->learning->record($a,'REJECTION','APPLICATION','RECRUITER_REJECTION',['thread'=>$thread->provider_thread_id]);
+                    $this->adaptive->updateForApplication($a,'response');
                 }
 
+                $this->adaptive->updateForApplication($a,'response');
                 $count++;
             }
         }

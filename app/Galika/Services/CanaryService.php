@@ -22,7 +22,7 @@ class CanaryService
     public function run(int $userId):GalikaCanaryRun
     {
         $run=GalikaCanaryRun::create([
-            'user_id'=>$userId,'run_key'=>(string)Str::uuid(),'scenario'=>'CAREER_END_TO_END',
+            'user_id'=>$userId,'run_key'=>(string)Str::uuid(),'scenario'=>'PIPELINE_READINESS',
             'state'=>'RUNNING','started_at'=>now(),'steps'=>[]
         ]);
 
@@ -68,7 +68,7 @@ class CanaryService
             $run->update([
                 'state'=>$hardFailure?'FAILED':'PASSED',
                 'steps'=>$steps,
-                'evidence'=>['checked_at'=>now()->toIso8601String(),'meaning'=>'Pipeline readiness and pre-submission acceptance; not a live external submission unless execution providers are connected.'],
+                'evidence'=>['checked_at'=>now()->toIso8601String(),'meaning'=>'Pipeline readiness only. A live CAREER_END_TO_END canary must perform an actual external submission, confirmation, delivery/inbound proof and should never be inferred from this readiness result.'],
                 'finished_at'=>now(),
                 'failure'=>$hardFailure?'One or more mandatory readiness gates failed':null,
             ]);

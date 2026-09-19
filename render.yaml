@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: work-lancer-2
+    name: work-lancer-web
     env: docker
     plan: starter
     healthCheckPath: /
+    dockerCommand: php artisan serve --host=0.0.0.0 --port=$PORT
     envVars:
       - key: APP_ENV
         value: production
@@ -24,6 +25,51 @@ services:
           type: redis
           name: work-lancer-redis
           property: connectionString
+
+  - type: worker
+    name: work-lancer-worker
+    env: docker
+    plan: starter
+    dockerCommand: php artisan queue:work redis --sleep=1 --tries=5 --timeout=240
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: APP_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: work-lancer-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: work-lancer-redis
+          property: connectionString
+
+  - type: worker
+    name: work-lancer-scheduler
+    env: docker
+    plan: starter
+    dockerCommand: php artisan schedule:work
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: APP_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: work-lancer-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: work-lancer-redis
+          property: connectionString
+
 databases:
   - name: work-lancer-db
     plan: starter
