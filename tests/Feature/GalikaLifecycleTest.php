@@ -154,7 +154,7 @@ class GalikaLifecycleTest extends TestCase
         $o=new GalikaOpportunity(['url'=>'https://jobs.lever.co/acme/1']);$this->assertSame('LEVER',$router->detect($o));
         $o=new GalikaOpportunity(['url'=>'https://acme.wd5.myworkdayjobs.com/job']);$this->assertSame('WORKDAY',$router->detect($o));
         $o=new GalikaOpportunity(['url'=>'https://www.linkedin.com/jobs/view/1']);$this->assertSame('LINKEDIN',$router->detect($o));
-        $o=new GalikaOpportunity(['url'=>'https://jobs.acme.test/apply']);$this->assertSame('GENERIC',$router->detect($o));
+        $o=new GalikaOpportunity(['url'=>'https://jobs.acme.test/apply']);$this->assertSame('EMPLOYER_FORM',$router->detect($o));
     }
 
     public function test_wealth_item_can_be_created_from_ui(): void
