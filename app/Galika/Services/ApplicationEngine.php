@@ -33,7 +33,8 @@ class ApplicationEngine
         private EmployerMemoryService $employerMemory,
         private AuthoritativeReverificationService $reverify,
         private CapacityPlannerService $capacity,
-        private DeepPrivacyDisclosureService $deepPrivacy
+        private DeepPrivacyDisclosureService $deepPrivacy,
+        private OutboxService $outbox
     ){}
 
     public function process(GalikaOpportunity $o,int $userId):GalikaApplication
@@ -200,6 +201,7 @@ class ApplicationEngine
             });
 
             $this->circuit->success('tinyfish');
+            $this->outbox->enqueue($a->user_id,'AIRTABLE','APPLICATION_UPSERT',['application_id'=>$a->id],'airtable:application:'.$a->id.':'.$a->updated_at?->timestamp);
             $this->followUp->schedule($a);
             $this->sourceMetrics->bump($o->source,'submitted');
             if($o->employer_id){$employer=\App\Models\GalikaEmployer::find($o->employer_id);if($employer)$this->employerMemory->refresh($a->user_id,$employer);}
