@@ -14,7 +14,13 @@ class AtsRouter
         if(str_contains($url,'myworkdayjobs.com')||str_contains($url,'workday.com')) return 'WORKDAY';
         if(str_contains($url,'linkedin.com')) return 'LINKEDIN';
         if(str_contains($url,'solvo.global')||str_contains($url,'solvo')) return 'SOLVO';
+        if(str_contains($url,'smartrecruiters.com')) return 'SMARTRECRUITERS';
+        if(str_contains($url,'jobvite.com')) return 'JOBVITE';
+        if(str_contains($url,'icims.com')) return 'ICIMS';
+        if(str_contains($url,'successfactors')) return 'SUCCESSFACTORS';
+        if(str_contains($url,'ceipal.com')||str_contains($url,'ceipaljobs.com')) return 'CEIPAL';
         if(str_contains($url,'next.co')||str_contains($url,'next-jobs')) return 'NEXT';
-        return 'GENERIC';
+        return 'EMPLOYER_FORM';
     }
+    public function browserFirstClass(string $type):bool{return in_array($type,['GREENHOUSE','LEVER','ASHBY','WORKDAY','LINKEDIN','CEIPAL','SOLVO','SMARTRECRUITERS','JOBVITE','ICIMS','SUCCESSFACTORS','NEXT','EMPLOYER_FORM'],true);}
 }
