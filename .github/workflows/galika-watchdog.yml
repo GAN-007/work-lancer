@@ -1,0 +1,16 @@
+name: GALIKA Watchdog
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check production health endpoint
+        env:
+          GALIKA_HEALTH_URL: ${{ secrets.GALIKA_HEALTH_URL }}
+          GALIKA_WATCHDOG_TOKEN: ${{ secrets.GALIKA_WATCHDOG_TOKEN }}
+        run: |
+          test -n "$GALIKA_HEALTH_URL"
+          curl --fail --silent --show-error --max-time 30 -H "Authorization: Bearer $GALIKA_WATCHDOG_TOKEN" "$GALIKA_HEALTH_URL"
