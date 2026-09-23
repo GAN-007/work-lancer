@@ -27,6 +27,7 @@ use App\Models\GalikaEvent;
 use App\Models\GalikaPersona;
 use App\Models\GalikaHumanAssist;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GalikaController extends Controller
 {
@@ -132,7 +133,26 @@ class GalikaController extends Controller
         $decision->application->update(['status'=>'VERIFIED','blocker'=>null,'failure_class'=>null]);
         return back()->with('success','Decision resolved and reusable knowledge saved.');
     }
-    public function analytics(Request $r){$uid=$r->user()->id;$q=GalikaApplication::where('user_id',$uid);$total=(clone $q)->count();$submitted=(clone $q)->where('status','SUBMITTED_CONFIRMED')->count();$interviews=(clone $q)->where('inbound_state','INTERVIEW')->count();$offers=(clone $q)->where('inbound_state','OFFER')->count();$avg=(clone $q)->whereNotNull('discovery_to_submit_sec')->avg('discovery_to_submit_sec');return view('galika.analytics',compact('total','submitted','interviews','offers','avg'));}
+    public function analytics(Request $r){
+        $uid=$r->user()->id;$q=GalikaApplication::where('user_id',$uid);
+        $total=(clone $q)->count();$submitted=(clone $q)->where('status','SUBMITTED_CONFIRMED')->count();$interviews=(clone $q)->where('inbound_state','INTERVIEW')->count();$offers=(clone $q)->where('inbound_state','OFFER')->count();$avg=(clone $q)->whereNotNull('discovery_to_submit_sec')->avg('discovery_to_submit_sec');
+        $statusCounts=(clone $q)->selectRaw('status, count(*) as n')->groupBy('status')->pluck('n','status');
+        $inboundCounts=(clone $q)->whereNotNull('inbound_state')->selectRaw('inbound_state, count(*) as n')->groupBy('inbound_state')->pluck('n','inbound_state');
+        $outcomes=[
+            'discovered'=>(int)($statusCounts['DISCOVERED']??0),
+            'eligible'=>(int)((clone $q)->whereHas('opportunity',fn($z)=>$z->where('eligibility','ELIGIBLE'))->count()),
+            'packaged'=>(int)((clone $q)->whereNotNull('resume_document_id')->count()),
+            'attempted'=>(int)((clone $q)->where('attempt_count','>',0)->count()),
+            'confirmed'=>$submitted,
+            'failed'=>(int)((clone $q)->whereIn('status',['FAILED_RETRYING','FAILED'])->count()),
+            'blocked'=>(int)((clone $q)->where('status','BLOCKED_REQUIRES_USER')->count()),
+            'acknowledged'=>(int)($inboundCounts['ACKNOWLEDGED']??0),
+            'assessment'=>(int)($inboundCounts['ASSESSMENT']??0),
+            'interview'=>$interviews,
+            'offer'=>$offers,
+        ];
+        return view('galika.analytics',compact('total','submitted','interviews','offers','avg','outcomes'));
+    }
 
     public function wealth(Request $r){return view('galika.wealth',['items'=>GalikaWealthItem::where('user_id',$r->user()->id)->orderBy('priority')->paginate(30)]);}
     public function createWealth(Request $r){
