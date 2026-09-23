@@ -33,7 +33,8 @@ class ApplicationEngine
         private EmployerMemoryService $employerMemory,
         private AuthoritativeReverificationService $reverify,
         private CapacityPlannerService $capacity,
-        private DeepPrivacyDisclosureService $deepPrivacy
+        private DeepPrivacyDisclosureService $deepPrivacy,
+        private EventLedgerService $events
     ){}
 
     public function process(GalikaOpportunity $o,int $userId):GalikaApplication
@@ -44,6 +45,7 @@ class ApplicationEngine
         );
 
         if(in_array($a->status,['SUBMITTED_CONFIRMED','DUPLICATE','INELIGIBLE','STALE','CLOSED'],true)) return $a;
+        $this->events->record($userId,'application',$a->id,'PROCESSING_STARTED',['opportunity_id'=>$o->id,'status'=>$a->status]);
 
         $profile=GalikaProfile::firstWhere('user_id',$userId);
         if(!$profile||$profile->pause_all_execution||!$profile->autonomous_apply_enabled){
@@ -51,7 +53,7 @@ class ApplicationEngine
             return $a;
         }
 
-        if($o->published_at&&$o->published_at->lt(now()->subDays(config('galika.max_age_days',30)))){
+        if($o->published_at&&$o->published_at->lt(now()->subHours(config('galika.fresh_fallback_hours',24)))){
             $a->update(['status'=>'STALE','failure_class'=>'CLOSED']);
             return $a;
         }
@@ -200,6 +202,8 @@ class ApplicationEngine
             });
 
             $this->circuit->success('tinyfish');
+            $this->events->record($a->user_id,'application',$a->id,'SUBMITTED_CONFIRMED',['confirmation_id'=>$a->confirmation_id,'route'=>$a->route]);
+            $this->events->outbox($a->user_id,'AIRTABLE_APPLICATION_REPLICA',['application_id'=>$a->id]);
             $this->followUp->schedule($a);
             $this->sourceMetrics->bump($o->source,'submitted');
             if($o->employer_id){$employer=\App\Models\GalikaEmployer::find($o->employer_id);if($employer)$this->employerMemory->refresh($a->user_id,$employer);}
