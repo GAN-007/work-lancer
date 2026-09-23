@@ -43,4 +43,6 @@ return [
  'airtable'=>['token'=>env('AIRTABLE_TOKEN'),'base_id'=>env('AIRTABLE_BASE_ID')],
  'tinyfish'=>['key'=>env('TINYFISH_API_KEY'),'endpoint'=>env('TINYFISH_ENDPOINT'),'health_endpoint'=>env('TINYFISH_HEALTH_ENDPOINT')],
  'jobicy'=>['endpoint'=>env('JOBICY_ENDPOINT','https://jobicy.com/api/v2/remote-jobs')],
+
+    'galika' => ['health_token' => env('GALIKA_HEALTH_TOKEN')],
 ];
