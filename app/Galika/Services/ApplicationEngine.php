@@ -51,7 +51,7 @@ class ApplicationEngine
             return $a;
         }
 
-        if($o->published_at&&$o->published_at->lt(now()->subDays(config('galika.max_age_days',30)))){
+        if($o->published_at&&$o->published_at->lt(now()->subHours(config('galika.fresh_fallback_hours',24)))){
             $a->update(['status'=>'STALE','failure_class'=>'CLOSED']);
             return $a;
         }
