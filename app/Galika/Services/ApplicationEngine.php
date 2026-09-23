@@ -33,7 +33,8 @@ class ApplicationEngine
         private EmployerMemoryService $employerMemory,
         private AuthoritativeReverificationService $reverify,
         private CapacityPlannerService $capacity,
-        private DeepPrivacyDisclosureService $deepPrivacy
+        private DeepPrivacyDisclosureService $deepPrivacy,
+        private OutboxService $outbox
     ){}
 
     public function process(GalikaOpportunity $o,int $userId):GalikaApplication
@@ -200,6 +201,7 @@ class ApplicationEngine
             });
 
             $this->circuit->success('tinyfish');
+            $this->outbox->publish('application.submitted',['status'=>'SUBMITTED_CONFIRMED','confirmation_id'=>$a->confirmation_id],$a->user_id,'application',$a->id);
             $this->followUp->schedule($a);
             $this->sourceMetrics->bump($o->source,'submitted');
             if($o->employer_id){$employer=\App\Models\GalikaEmployer::find($o->employer_id);if($employer)$this->employerMemory->refresh($a->user_id,$employer);}
@@ -213,6 +215,7 @@ class ApplicationEngine
                 'submission_state_detail'=>'SITE_ERROR',
                 'next_retry_at'=>now()->addMinutes(min(60,2**min(6,$a->attempt_count))),
             ]);
+            $this->outbox->publish('application.retrying',['failure_class'=>'SITE_ERROR','error'=>mb_substr($e->getMessage(),0,1000)],$a->user_id,'application',$a->id);
             report($e);
             return $a;
         }
