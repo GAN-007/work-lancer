@@ -5,10 +5,12 @@ use App\Http\Controllers\Freelancer\FreelancerController;
 use App\Http\Controllers\PagesController;
 use App\Http\Controllers\User\UserController;
 use App\Http\Controllers\GalikaController;
+use App\Http\Controllers\GalikaHealthController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/',fn()=>view('welcome'));
+Route::get('/galika-health',GalikaHealthController::class);
 Route::get('/employer_account',fn()=>view('auth.register-employer'));
 Route::post('/createEmployer',[PagesController::class,'createEmployer'])->name('createEmployer');
 Route::post('/createFreelancer',[PagesController::class,'createFreelancer'])->name('createFreelancer');
