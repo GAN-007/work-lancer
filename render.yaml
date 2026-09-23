@@ -27,10 +27,10 @@ services:
           property: connectionString
 
   - type: worker
-    name: work-lancer-worker
+    name: work-lancer-galika-executor
     env: docker
     plan: starter
-    dockerCommand: php artisan queue:work redis --sleep=1 --tries=5 --timeout=240
+    dockerCommand: php artisan galika:daemon --sleep=2 --batch=25
     envVars:
       - key: APP_ENV
         value: production
