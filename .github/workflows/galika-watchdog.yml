@@ -7,16 +7,10 @@ jobs:
   watchdog:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-      - run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Run migrations and recovery watchdog
+      - name: Probe production worker health
         env:
-          APP_ENV: production
-          APP_KEY: ${{ secrets.APP_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          HEALTH_URL: ${{ secrets.GALIKA_HEALTH_URL }}
+          HEALTH_TOKEN: ${{ secrets.GALIKA_HEALTH_TOKEN }}
         run: |
-          php artisan migrate --force
-          php artisan galika:watchdog
+          test -n "$HEALTH_URL" && test -n "$HEALTH_TOKEN"
+          curl --fail --retry 3 --retry-delay 5 --max-time 20 -H "X-GALIKA-HEALTH-TOKEN: $HEALTH_TOKEN" "$HEALTH_URL"
