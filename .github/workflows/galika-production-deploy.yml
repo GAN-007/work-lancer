@@ -1,5 +1,7 @@
 name: GALIKA production deploy
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       ref:
@@ -30,8 +32,9 @@ jobs:
             set -euo pipefail
             cd "${{ secrets.PRODUCTION_PATH }}"
             git fetch origin
-            git checkout "${{ inputs.ref }}"
-            git pull --ff-only origin "${{ inputs.ref }}"
+            DEPLOY_REF="${{ inputs.ref || github.ref_name }}"
+            git checkout "$DEPLOY_REF"
+            git pull --ff-only origin "$DEPLOY_REF"
             composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             php artisan migrate --force
             php artisan config:cache
