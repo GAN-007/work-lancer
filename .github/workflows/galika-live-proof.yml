@@ -1,0 +1,29 @@
+name: GALIKA controlled live proof
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: GALIKA user id
+        required: true
+      opportunity_id:
+        description: Explicitly approved fresh opportunity id for the real submission
+        required: true
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Migrate and perform one controlled real submission
+        env:
+          APP_ENV: production
+          APP_KEY: ${{ secrets.APP_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          test -n "$APP_KEY" && test -n "$DATABASE_URL"
+          php artisan migrate --force
+          php artisan galika:prove-live "${{ inputs.user_id }}" "${{ inputs.opportunity_id }}" --wait=120
