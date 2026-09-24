@@ -12,6 +12,13 @@ jobs:
         with:
           php-version: '8.2'
       - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Validate production runtime secrets
+        env:
+          APP_KEY: ${{ secrets.APP_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          test -n "$APP_KEY" || { echo "::error::APP_KEY secret is not configured"; exit 1; }
+          test -n "$DATABASE_URL" || { echo "::error::DATABASE_URL secret is not configured"; exit 1; }
       - name: Run migrations and recovery watchdog
         env:
           APP_ENV: production
@@ -19,4 +26,5 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           php artisan migrate --force
+          php artisan galika:doctor
           php artisan galika:watchdog
