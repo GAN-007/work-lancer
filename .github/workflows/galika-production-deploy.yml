@@ -39,6 +39,6 @@ jobs:
             sudo cp deploy/supervisor/galika-worker.conf /etc/supervisor/conf.d/galika-worker.conf
             sudo supervisorctl reread
             sudo supervisorctl update
-            sudo supervisorctl restart galika-worker galika-outbox galika-scheduler
-            sudo supervisorctl status galika-worker galika-outbox galika-scheduler
+            sudo supervisorctl restart galika-daemon galika-scheduler
+            sudo supervisorctl status galika-daemon galika-scheduler
             php artisan galika:watchdog
