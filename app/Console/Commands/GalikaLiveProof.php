@@ -5,7 +5,6 @@ use App\Galika\Services\ApplicationEngine;
 use App\Galika\Services\DeliveryReconciliationService;
 use App\Galika\Services\RecruiterThreadService;
 use App\Models\GalikaApplication;
-use App\Models\GalikaCanonicalEvent;
 use App\Models\GalikaOpportunity;
 use Illuminate\Console\Command;
 
