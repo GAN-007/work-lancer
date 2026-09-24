@@ -1,0 +1,44 @@
+name: GALIKA production deploy
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy
+        required: true
+        default: main
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Require deployment secrets
+        env:
+          HOST: ${{ secrets.PRODUCTION_HOST }}
+          USER: ${{ secrets.PRODUCTION_USER }}
+          KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          PATH_ON_HOST: ${{ secrets.PRODUCTION_PATH }}
+        run: |
+          test -n "$HOST" && test -n "$USER" && test -n "$KEY" && test -n "$PATH_ON_HOST"
+      - name: Deploy, migrate, and restart GALIKA workers
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.PRODUCTION_PATH }}"
+            git fetch origin
+            git checkout "${{ inputs.ref }}"
+            git pull --ff-only origin "${{ inputs.ref }}"
+            composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+            sudo cp deploy/supervisor/galika-worker.conf /etc/supervisor/conf.d/galika-worker.conf
+            sudo supervisorctl reread
+            sudo supervisorctl update
+            sudo supervisorctl restart galika-daemon galika-scheduler
+            sudo supervisorctl status galika-daemon galika-scheduler
+            php artisan galika:watchdog
