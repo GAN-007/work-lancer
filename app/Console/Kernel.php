@@ -11,6 +11,7 @@ class Kernel extends ConsoleKernel {
   $schedule->command('galika:worker --limit=50')->everyMinute()->withoutOverlapping(10)->onOneServer()->runInBackground();
   $schedule->command('galika:outbox --limit=100')->everyMinute()->withoutOverlapping(10)->onOneServer()->runInBackground();
   $schedule->command('galika:watchdog')->everyMinute()->withoutOverlapping(5)->onOneServer()->runInBackground();
+  $schedule->command('galika:reconcile-acks')->everyMinute()->withoutOverlapping(10)->onOneServer()->runInBackground();
  }
  protected function commands(){$this->load(__DIR__.'/Commands');require base_path('routes/console.php');}
 }

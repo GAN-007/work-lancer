@@ -26,3 +26,4 @@ jobs:
         env:
           DB_CONNECTION: sqlite
           DB_DATABASE: database/database.sqlite
+      - run: php artisan list | grep -E 'galika:production-canary|galika:reconcile-acks|galika:daemon'
