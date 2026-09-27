@@ -3,7 +3,7 @@
 @section('content')
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
   <div>
-    <h2>GALIKA Command Center</h2>
+    <h2>Career Command Center</h2>
     <p class="text-muted mb-0">External outcomes first: applications, buyer conversion, cash, MRR, and runtime truth.</p>
   </div>
   <span class="status">{{ $profile->pause_all_execution ? 'PAUSED' : ($profile->autonomous_apply_enabled ? 'AUTONOMOUS' : 'REVIEW MODE') }}</span>
