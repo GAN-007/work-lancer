@@ -101,8 +101,9 @@ class GalikaEconomicResilienceTest extends TestCase
 
     public function test_outbox_moves_to_dead_letter_and_can_be_replayed(): void
     {
+        $user=User::factory()->create();
         DB::table('galika_outbox')->insert([
-            'event_id'=>'evt-1','user_id'=>null,'destination'=>'airtable','kind'=>'TEST',
+            'event_id'=>'evt-1','user_id'=>$user->id,'destination'=>'airtable','kind'=>'TEST',
             'payload'=>json_encode(['x'=>1]),'status'=>'RETRY','attempts'=>8,
             'available_at'=>now(),'leased_until'=>null,'last_error'=>'broken',
             'created_at'=>now(),'updated_at'=>now()
