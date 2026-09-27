@@ -7,4 +7,10 @@ return [
  'discovery'=>['queries'=>array_values(array_filter(array_map('trim',explode(',',env('GALIKA_DISCOVERY_QUERIES','AI Engineer,Machine Learning Engineer,Data Scientist,Data Engineer,Full Stack Developer,Backend Engineer,Technical Lead,AI Finance')))))],
  'airtable'=>['critical_path'=>false,'replica_only'=>true],
  'confirmation_required'=>true,
+ 'system_one'=>[
+     'mode'=>env('GALIKA_SYSTEM_ONE_MODE','off'),
+     'base_url'=>env('GALIKA_SYSTEM_ONE_BASE_URL',''),
+     'api_key'=>env('GALIKA_SYSTEM_ONE_API_KEY',''),
+     'timeout_seconds'=>(float)env('GALIKA_SYSTEM_ONE_TIMEOUT_SECONDS',1.5),
+ ],
 ];
