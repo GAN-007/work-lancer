@@ -26,6 +26,10 @@ use App\Models\GalikaOffer;
 use App\Models\GalikaEvent;
 use App\Models\GalikaPersona;
 use App\Models\GalikaHumanAssist;
+use App\Models\GalikaScorecard;
+use App\Models\GalikaInvoice;
+use App\Models\GalikaPaymentTransaction;
+use App\Models\GalikaCustomer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -42,6 +46,11 @@ class GalikaController extends Controller
             'decisions'=>GalikaDecision::whereHas('application',fn($q)=>$q->where('user_id',$uid))->where('status','OPEN')->get(),
             'integrations'=>GalikaConnection::where('user_id',$uid)->get(),
             'wealth'=>GalikaWealthItem::where('user_id',$uid)->orderBy('priority')->limit(10)->get(),
+            'scorecard'=>GalikaScorecard::where('user_id',$uid)->orderByDesc('period_end')->first(),
+            'openInvoices'=>GalikaInvoice::where('user_id',$uid)->whereIn('state',['ISSUED','PARTIALLY_PAID'])->orderByDesc('issued_at')->limit(10)->get(),
+            'recentPayments'=>GalikaPaymentTransaction::where('user_id',$uid)->where('state','CONFIRMED')->orderByDesc('confirmed_at')->limit(10)->get(),
+            'customers'=>GalikaCustomer::where('user_id',$uid)->where('state','CUSTOMER')->count(),
+            'runtimeIncidents'=>DB::table('galika_runtime_incidents')->where('state','OPEN')->orderByDesc('last_seen_at')->limit(10)->get(),
         ]);
     }
 

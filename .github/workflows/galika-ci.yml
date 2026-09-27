@@ -30,7 +30,7 @@ jobs:
           DB_DATABASE: database/database.sqlite
       - name: Verify critical GALIKA commands
         run: |
-          php artisan list | grep -E 'galika:production-canary|galika:prove-live|galika:reconcile-acks|galika:daemon|galika:doctor|galika:watchdog'
+          php artisan list | grep -E 'galika:production-canary|galika:prove-live|galika:reconcile-acks|galika:daemon|galika:doctor|galika:watchdog|galika:scorecard|galika:replay-dead-letter|galika:backup-check'
       - name: Verify runtime configuration parity
         run: |
           grep -q 'galika:daemon' deploy/supervisor/galika-worker.conf
