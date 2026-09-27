@@ -33,7 +33,8 @@ class ApplicationEngine
         private EmployerMemoryService $employerMemory,
         private AuthoritativeReverificationService $reverify,
         private CapacityPlannerService $capacity,
-        private DeepPrivacyDisclosureService $deepPrivacy
+        private DeepPrivacyDisclosureService $deepPrivacy,
+        private SystemOneDecisionService $systemOne
     ){}
 
     public function process(GalikaOpportunity $o,int $userId):GalikaApplication
@@ -89,6 +90,7 @@ class ApplicationEngine
         $persona=$this->personas->select($userId,$o);
         if($persona)$a->update(['persona_id'=>$persona->id]);
         $candidate=$this->candidate($userId,$profile);
+        $systemOne=$this->systemOne->classify($o,$candidate);
         $analysis=$this->ai->analyze($candidate,$o->toArray());
         $o->update([
             'verified_at'=>now(),
@@ -96,7 +98,7 @@ class ApplicationEngine
             'eligibility'=>$analysis['eligible']?'ELIGIBLE':'INELIGIBLE',
             'match_score'=>$analysis['score'],
             'expected_value'=>((float)$analysis['score'])/100,
-            'evidence'=>array_merge($o->evidence??[],['qualification'=>$analysis,'location'=>$geo]),
+            'evidence'=>array_merge($o->evidence??[],['qualification'=>$analysis,'location'=>$geo],$systemOne!==null?['system_one'=>$systemOne]:[]),
         ]);
 
         if(!$analysis['eligible']||$analysis['score']<$profile->minimum_match_score){
