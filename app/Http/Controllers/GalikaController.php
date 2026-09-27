@@ -30,7 +30,6 @@ use App\Models\GalikaScorecard;
 use App\Models\GalikaInvoice;
 use App\Models\GalikaPaymentTransaction;
 use App\Models\GalikaCustomer;
-use App\Models\GalikaRuntimeIncident;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
