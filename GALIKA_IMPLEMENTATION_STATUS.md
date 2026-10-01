@@ -24,7 +24,7 @@ DISCOVER -> CANONICALIZE -> DEDUPE -> REVERIFY -> QUALIFY -> MATERIAL-ANSWER GAT
 - Source adapters for supported job feeds and browser-capable discovery routes
 - ATS/browser application adapters with idempotency and retry controls
 - OpenAI-backed qualification and natural application writing constrained to verified candidate facts
-- Airtable synchronization with the GAN Wealth OS operational tables
+- PostgreSQL-authoritative operational state with optional self-hosted Baserow projection
 - Gmail delivery reconciliation, DSN/bounce handling, acknowledgements and recruiter-response ingestion
 - Route registry that suppresses hard-bounced or invalid routes
 - Platform health, exponential backoff, concurrency limits and circuit breakers
@@ -47,7 +47,7 @@ The platform is not production-complete until all of the following pass:
 6. source adapter contract tests;
 7. application-route contract tests;
 8. Gmail hard/soft bounce reconciliation tests;
-9. Airtable sync tests;
+9. PostgreSQL projection and optional Baserow mirror tests;
 10. browser/ATS synthetic tests for supported routes;
 11. scheduler/worker soak test;
 12. UI tests for candidate, opportunity, application, decision and analytics journeys;
