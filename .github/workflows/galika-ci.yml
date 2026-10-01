@@ -4,8 +4,9 @@ on:
     branches: [main, galika-os]
   pull_request:
     branches: [main]
+
 jobs:
-  test:
+  laravel:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,8 +31,30 @@ jobs:
           DB_DATABASE: database/database.sqlite
       - name: Verify critical GALIKA commands
         run: |
-          php artisan list | grep -E 'galika:production-canary|galika:prove-live|galika:reconcile-acks|galika:daemon|galika:doctor|galika:watchdog|galika:scorecard|galika:replay-dead-letter|galika:backup-check'
+          php artisan list | grep -E 'galika:production-canary|galika:prove-live|galika:reconcile-acks|galika:daemon|galika:doctor|galika:watchdog|galika:scorecard|galika:replay-dead-letter|galika:backup-check|galika:outbox'
       - name: Verify runtime configuration parity
         run: |
           grep -q 'galika:daemon' deploy/supervisor/galika-worker.conf
           grep -q 'galika:daemon' docker/supervisord.conf
+
+  open-source-execution-plane:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/open-web-agent/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r services/open-web-agent/requirements.txt
+      - name: Validate sidecar syntax and imports
+        run: |
+          python -m py_compile services/open-web-agent/app.py
+          python -c "import browser_use, crawl4ai, fastapi, httpx; print('open-source execution dependencies import successfully')"
+      - name: Validate Docker Compose topology
+        env:
+          APP_KEY: base64:dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0
+          POSTGRES_PASSWORD: ci-postgres-password
+          SEARXNG_SECRET: ci-searxng-secret
+        run: docker compose -f docker-compose.open-source.yml config >/tmp/worklancer-compose.yml

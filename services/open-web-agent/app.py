@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import hmac
 import ipaddress
 import json
 import os
@@ -268,7 +269,7 @@ def write_attachments(directory: str, attachments: list[Attachment]) -> list[str
             raise HTTPException(status_code=413, detail=f"Attachment {safe_name} exceeds configured size limit")
 
         actual = hashlib.sha256(content).hexdigest()
-        if not attachment.sha256 or not hashlib.compare_digest(actual, attachment.sha256.lower()):
+        if not attachment.sha256 or not hmac.compare_digest(actual, attachment.sha256.lower()):
             raise HTTPException(status_code=422, detail=f"Attachment integrity check failed for {safe_name}")
 
         path = (root / safe_name).resolve()
