@@ -9,7 +9,8 @@ class ConnectionHealthService
     public function __construct(
         private ConnectionVault $vault,
         private OAuthService $oauth,
-        private OpenWebAgentAdapter $webAgent
+        private OpenWebAgentAdapter $webAgent,
+        private BaserowAdapter $baserow
     ){}
 
     public function test(int $userId,string $provider):array
@@ -17,6 +18,10 @@ class ConnectionHealthService
         try{
             if($provider==='open_web_agent'){
                 return $this->webAgent->health();
+            }
+
+            if($provider==='baserow'){
+                return $this->baserow->health();
             }
 
             if($provider==='openai'){
@@ -40,7 +45,9 @@ class ConnectionHealthService
             $this->vault->markHealth($userId,$provider,$ok,$ok?null:$r->body());
             return ['ok'=>$ok,'status'=>$r->status()];
         }catch(Throwable $e){
-            $this->vault->markHealth($userId,$provider,false,$e->getMessage());
+            if(in_array($provider,['openai','gmail','linkedin','lever'],true)){
+                $this->vault->markHealth($userId,$provider,false,$e->getMessage());
+            }
             return ['ok'=>false,'error'=>$e->getMessage()];
         }
     }

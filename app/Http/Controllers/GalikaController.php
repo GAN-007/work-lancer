@@ -2,7 +2,6 @@
 namespace App\Http\Controllers;
 
 use App\Galika\Services\CanaryService;
-use App\Galika\Services\AirtableAdapter;
 use App\Galika\Services\ApplicationCorrectionService;
 use App\Galika\Services\HumanAssistService;
 use App\Galika\Services\ConnectionHealthService;
@@ -15,7 +14,6 @@ use App\Models\GalikaConnection;
 use App\Models\GalikaDecision;
 use App\Models\GalikaDocument;
 use App\Models\GalikaEvidence;
-use App\Models\GalikaIntegration;
 use App\Models\GalikaOpportunity;
 use App\Models\GalikaProfile;
 use App\Models\GalikaWealthItem;
@@ -94,23 +92,29 @@ class GalikaController extends Controller
         return redirect()->route('galika.profile')->with('success','Verified CV evidence added to your GALIKA profile.');
     }
 
-    public function connections(Request $r,AirtableAdapter $airtable){
-        $connections=GalikaConnection::where('user_id',$r->user()->id)->get();
-        $bases=[];$airtableError=null;
-        if($connections->firstWhere('provider','airtable')){
-            try{$bases=$airtable->bases($r->user()->id);}catch(\Throwable $e){$airtableError=$e->getMessage();}
-        }
-        return view('galika.connections',compact('connections','bases','airtableError'));
-    }
-
-    public function selectAirtableBase(Request $r,AirtableAdapter $airtable){
-        $data=$r->validate(['base_id'=>'required|string|regex:/^app[A-Za-z0-9]{14}$/','base_name'=>'required|string|max:255']);
-        $airtable->selectBase($r->user()->id,$data['base_id'],$data['base_name']);
-        return back()->with('success','Airtable base selected.');
+    public function connections(Request $r){
+        return view('galika.connections',[
+            'connections'=>GalikaConnection::where('user_id',$r->user()->id)
+                ->whereNotIn('provider',['airtable','airtable_legacy'])
+                ->where('provider','not like','airtable_legacy_%')
+                ->get(),
+            'systemServices'=>[
+                'open_web_agent'=>[
+                    'configured'=>(string)config('services.open_web_agent.endpoint')!=='',
+                    'description'=>'Self-hosted Browser Use + Playwright execution backed by local Ollama.',
+                ],
+                'baserow'=>[
+                    'configured'=>(bool)config('services.baserow.enabled')
+                        && (string)config('services.baserow.token')!==''
+                        && (string)config('services.baserow.table_id')!=='',
+                    'description'=>'Optional self-hosted operational mirror. PostgreSQL remains authoritative.',
+                ],
+            ],
+        ]);
     }
 
     public function saveApiConnection(Request $r,ConnectionVault $vault){
-        $data=$r->validate(['provider'=>'required|in:openai,airtable,tinyfish','api_key'=>'required|string|min:8']);
+        $data=$r->validate(['provider'=>'required|in:openai','api_key'=>'required|string|min:8']);
         $vault->store($r->user()->id,$data['provider'],'api_key',['api_key'=>$data['api_key']]);
         return back()->with('success',ucfirst($data['provider']).' credential saved securely.');
     }
@@ -121,11 +125,12 @@ class GalikaController extends Controller
     }
 
     public function oauthStart(Request $r,string $provider,OAuthService $oauth){
-        abort_unless(in_array($provider,['gmail','airtable','linkedin','lever'],true),404);
+        abort_unless(in_array($provider,['gmail','linkedin','lever'],true),404);
         return redirect()->away($oauth->authorizationUrl($r->user()->id,$provider));
     }
 
     public function oauthCallback(Request $r,string $provider,OAuthService $oauth){
+        abort_unless(in_array($provider,['gmail','linkedin','lever'],true),404);
         $r->validate(['code'=>'required|string','state'=>'required|string']);
         $oauth->exchange($r->user()->id,$provider,(string)$r->string('code'),(string)$r->string('state'));
         return redirect()->route('galika.connections')->with('success',ucfirst($provider).' connected.');
@@ -142,6 +147,7 @@ class GalikaController extends Controller
         $decision->application->update(['status'=>'VERIFIED','blocker'=>null,'failure_class'=>null]);
         return back()->with('success','Decision resolved and reusable knowledge saved.');
     }
+
     public function analytics(Request $r){
         $uid=$r->user()->id;$q=GalikaApplication::where('user_id',$uid);
         $total=(clone $q)->count();$submitted=(clone $q)->where('status','SUBMITTED_CONFIRMED')->count();$interviews=(clone $q)->where('inbound_state','INTERVIEW')->count();$offers=(clone $q)->where('inbound_state','OFFER')->count();$avg=(clone $q)->whereNotNull('discovery_to_submit_sec')->avg('discovery_to_submit_sec');
