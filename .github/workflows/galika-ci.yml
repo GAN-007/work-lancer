@@ -41,6 +41,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate one-command setup launcher
+        run: |
+          test -x setup.sh
+          bash -n setup.sh
+          bash -n scripts/bootstrap-open-source-stack.sh
+          ./setup.sh --help >/tmp/worklancer-setup-help.txt
+          grep -q "Worklancer one-command setup" /tmp/worklancer-setup-help.txt
+      - name: Build Worklancer runtime image
+        run: docker build -t worklancer-ci .
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

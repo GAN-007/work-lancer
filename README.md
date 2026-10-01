@@ -427,6 +427,42 @@ For production-scale execution, also use:
 
 ---
 
+## One-command setup
+
+For a complete local Worklancer installation, the recommended path is now:
+
+```bash
+git clone https://github.com/GAN-007/work-lancer.git
+cd work-lancer
+./setup.sh
+```
+
+The launcher performs the full local bootstrap:
+
+- updates the Git checkout with a safe fast-forward pull
+- detects the repository dependency manifests
+- installs missing bootstrap tools and Docker/Compose on supported Linux/macOS environments
+- builds PHP/Composer, Node/Vite, and Python/Open Web Agent requirements inside containers
+- generates persistent local secrets in `.env.open-source` without overwriting existing values
+- selects an available localhost port automatically
+- starts PostgreSQL, Redis, Ollama, SearXNG, Open Web Agent, Laravel HTTP, GALIKA daemon, scheduler, and queue workers
+- pulls the configured Ollama model
+- runs all Laravel database migrations
+- clears stale Laravel caches and creates the storage link
+- waits until the HTTP application is actually responding
+- opens the selected Worklancer URL in the default browser
+
+Useful options:
+
+```bash
+./setup.sh --no-open
+./setup.sh --port 8095
+./setup.sh --baserow
+./setup.sh --help
+```
+
+The selected port is persisted as `WORKLANCER_PORT` in `.env.open-source`. The Docker application port remains internal on 8000 and is bound only to `127.0.0.1`.
+
 ## Installation
 
 Clone the repository:
