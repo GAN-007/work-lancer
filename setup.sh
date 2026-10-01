@@ -354,7 +354,7 @@ env_set() {
 }
 
 ensure_env() {
-  local port="$1"
+  local port="$1" baserow_port
   if [[ ! -f "$ENV_FILE" ]]; then
     umask 077
     touch "$ENV_FILE"
@@ -373,6 +373,17 @@ ensure_env() {
 
   if ((ENABLE_BASEROW == 1)); then
     env_set BASEROW_ENABLED "true"
+    baserow_port="$(env_get BASEROW_PORT || true)"
+    if [[ -z "$baserow_port" || ! "$baserow_port" =~ ^[0-9]+$ || "$baserow_port" == "$port" ]] || ! is_port_free "$baserow_port"; then
+      for ((baserow_port=8090; baserow_port<=8190; baserow_port++)); do
+        [[ "$baserow_port" == "$port" ]] && continue
+        if is_port_free "$baserow_port"; then
+          break
+        fi
+      done
+      ((baserow_port <= 8190)) || die "Could not find a free port for optional Baserow"
+    fi
+    env_set BASEROW_PORT "$baserow_port"
   fi
 
   chmod 600 "$ENV_FILE" 2>/dev/null || true
@@ -439,6 +450,11 @@ main() {
   local port url
   port="$(choose_port)"
   url="http://127.0.0.1:$port"
+
+  if [[ -f "$ENV_FILE" ]] && [[ "$(env_get BASEROW_ENABLED || true)" == "true" ]]; then
+    ENABLE_BASEROW=1
+  fi
+
   ensure_env "$port"
 
   log "Selected free localhost port: $port"
@@ -463,6 +479,9 @@ main() {
   echo
   ok "Worklancer is running end to end."
   printf 'URL: %s\n' "$url"
+  if ((ENABLE_BASEROW == 1)); then
+    printf 'Baserow: http://127.0.0.1:%s\n' "$(env_get BASEROW_PORT)"
+  fi
   printf 'Stop: %q ' "${COMPOSE[@]}"
   printf '%q ' --env-file "$ENV_FILE" -f "$COMPOSE_FILE" down
   printf '\n'
