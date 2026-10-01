@@ -136,6 +136,9 @@ sync_repository() {
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd 2>/dev/null || pwd)"
   candidate="$(repo_root_from "$script_dir")"
   [[ -n "$candidate" ]] || candidate="$(repo_root_from "$PWD")"
+  if [[ -n "$candidate" && ( ! -f "$candidate/composer.json" || ! -f "$candidate/docker-compose.open-source.yml" ) ]]; then
+    candidate=""
+  fi
 
   if [[ -z "$candidate" ]]; then
     ROOT="$(python3 - <<PY 2>/dev/null || true
@@ -167,7 +170,11 @@ PY
     log "Updating Git checkout${current:+ ($current)}"
     git -C "$ROOT" fetch --prune origin
     if ! git -C "$ROOT" pull --ff-only; then
-      die "Git pull could not fast-forward safely. Commit/stash local changes or run with --no-pull."
+      if [[ "$current" == "main" ]] && git -C "$ROOT" pull --ff-only origin main; then
+        :
+      else
+        die "Git pull could not fast-forward safely. Commit/stash local changes or run with --no-pull."
+      fi
     fi
     after="$(sha256_file "$ROOT/setup.sh" 2>/dev/null || true)"
     if [[ -n "$before" && -n "$after" && "$before" != "$after" && "${WORKLANCER_SETUP_REEXEC:-0}" != "1" ]]; then
