@@ -1,11 +1,13 @@
-# GALIKA PostgreSQL-authoritative execution
+# PostgreSQL-authoritative GALIKA runtime
 
-PostgreSQL is the system of record. Airtable is a recoverable asynchronous projection only.
+PostgreSQL is the system of record for opportunities, applications, answers, events, work items, delivery state, projections, incidents, and audit history. No external spreadsheet/database service is required for qualification, application submission, reconciliation, or recovery.
 
-Execution path: discovery -> PostgreSQL opportunity -> durable work item -> application model verification/qualification -> browser/ATS worker -> explicit confirmation evidence -> PostgreSQL application/event ledger -> Gmail reconciliation -> asynchronous Airtable projection.
+Execution path: discovery -> PostgreSQL opportunity -> durable work item -> verification/qualification -> Open Web Agent browser worker -> explicit confirmation evidence -> PostgreSQL application/event ledger -> Gmail reconciliation -> asynchronous projection.
 
-No Airtable read, AI action, quota, or automation is required to qualify or submit. Failed external effects remain in PostgreSQL queues/outbox and retry with backoff. GitHub Actions is watchdog/failover only; the Render daemon is the immediate always-on executor.
+The browser/search/fetch execution plane is self-hosted. Worklancer calls the local Open Web Agent sidecar, which combines Browser Use + Playwright for interactive execution, Crawl4AI for dynamic page retrieval, SearXNG for metasearch, and a local model through Ollama or an OpenAI-compatible self-hosted endpoint.
 
-A submission is confirmed only when the ATS/browser adapter returns explicit confirmation evidence. Attempts, SENT mail, labels and configuration never imply submission.
+Baserow is optional and never authoritative. When enabled, galika_outbox events are materialized first into galika_projection_records in PostgreSQL and then mirrored to Baserow asynchronously. If Baserow is unavailable, the canonical event and projection remain durable in PostgreSQL and the outbox retry/dead-letter flow preserves the failed side effect for recovery.
 
-Airtable catches up from galika_outbox after recovery. PostgreSQL remains authoritative during and after replica outages.
+The migration 2026_10_01_070000_replace_airtable_with_open_source_projection.php converts pending legacy Airtable outbox destinations to Baserow and renames old Airtable credential rows to airtable_legacy* so historical configuration is retained for audit without remaining active.
+
+No TinyFish or Airtable token, quota, automation, or API call is required by the live application path.

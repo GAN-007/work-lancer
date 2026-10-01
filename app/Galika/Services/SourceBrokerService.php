@@ -4,10 +4,17 @@ use App\Models\GalikaOpportunity;
 use App\Models\GalikaProfile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+
 class SourceBrokerService{
- public function __construct(private CanonicalizationService $canonical,private PlatformCircuitBreaker $circuit,private GmailAdapter $gmail,private SourceMetricService $metrics){}
+ public function __construct(
+  private CanonicalizationService $canonical,
+  private PlatformCircuitBreaker $circuit,
+  private GmailAdapter $gmail,
+  private SourceMetricService $metrics,
+  private OpenWebResearchAdapter $openWeb
+ ){}
  public function discover():int{
-  $count=$this->jobicy()+$this->configuredBoards();
+  $count=$this->jobicy()+$this->configuredBoards()+$this->openSearch();
   GalikaProfile::where('pause_all_execution',false)->each(function($p)use(&$count){try{$count+=$this->gmailAlerts($p->user_id);}catch(\Throwable $e){report($e);}});
   return $count;
  }
@@ -35,6 +42,35 @@ class SourceBrokerService{
   }
   return $created;
  }
+ private function openSearch():int{
+  if(!config('galika.discovery.open_search_enabled',false)||!$this->circuit->available('open_search'))return 0;
+  $created=0;
+  try{
+   foreach(config('galika.discovery.queries',[]) as $query){
+    foreach($this->openWeb->searchJobs($query,(int)config('galika.discovery.open_search_results_per_query',12)) as $row){
+     $url=(string)($row['url']??'');
+     if(!filter_var($url,FILTER_VALIDATE_URL))continue;
+     if(!preg_match('~(jobs?|careers?|greenhouse|lever|workday|ashby|linkedin|smartrecruiters|recruitee|breezy)~i',$url))continue;
+     $payload=[
+      'source'=>'open_search',
+      'external_id'=>sha1($url),
+      'employer'=>$this->employerFromUrl($url),
+      'title'=>trim(strip_tags((string)($row['title']??$query)))?:$query,
+      'location'=>null,
+      'url'=>$url,
+      'description'=>Str::limit(strip_tags((string)($row['content']??'')),5000,''),
+      'published_at'=>null,
+     ];
+     if($this->persist($payload,$row)){$created++;$this->metrics->bump('open_search','discovered');}
+    }
+   }
+   $this->circuit->success('open_search');
+  }catch(\Throwable $e){
+   $this->circuit->failure('open_search',$e->getMessage());
+   report($e);
+  }
+  return $created;
+ }
  private function jobicy():int{
   if(!$this->circuit->available('jobicy'))return 0;$created=0;
   foreach(config('galika.discovery.queries') as $q){
@@ -59,6 +95,13 @@ class SourceBrokerService{
   }return $created;
  }
  private function employerFromSubject(string $s):string{$s=preg_replace('/^(new|job alert|opportunity|hiring)[:\-\s]+/i','',$s);return trim(Str::before($s,' - '))?:'Unknown';}
+ private function employerFromUrl(string $url):string{
+  $host=strtolower((string)parse_url($url,PHP_URL_HOST));
+  $host=preg_replace('/^www\./','',$host);
+  $parts=explode('.',$host);
+  if(count($parts)>=2)return ucfirst(str_replace(['-','_'],' ',count($parts)>2?$parts[count($parts)-3]:$parts[0]));
+  return $host?:'Unknown';
+ }
  private function persist(array $payload,array $evidence):bool{
   if(empty($payload['url']))return false;if($this->canonical->resolve($payload))return false;
   $fp=$this->canonical->fingerprint($payload);

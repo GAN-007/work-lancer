@@ -1,0 +1,183 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: worklancer
+      POSTGRES_USER: worklancer
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - worklancer-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U worklancer -d worklancer"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server","--appendonly","yes"]
+    volumes:
+      - worklancer-redis:/data
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - worklancer-ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD","ollama","list"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  ollama-init:
+    image: ollama/ollama:latest
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh","-c"]
+    command: ["ollama pull ${OLLAMA_MODEL:-qwen3:8b}"]
+
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      SEARXNG_BIND_ADDRESS: 0.0.0.0
+      SEARXNG_PORT: 8080
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?Set SEARXNG_SECRET}
+      SEARXNG_LIMITER: "false"
+      SEARXNG_PUBLIC_INSTANCE: "false"
+    volumes:
+      - ./services/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    expose:
+      - "8080"
+
+  browser-model:
+    image: vllm/vllm-openai:latest
+    profiles: ["browser-optimized"]
+    restart: unless-stopped
+    command:
+      - --model
+      - browser-use/bu-30b-a3b-preview
+      - --max-model-len
+      - "65536"
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  open-web-agent:
+    build:
+      context: ./services/open-web-agent
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+      searxng:
+        condition: service_started
+    environment:
+      OPEN_WEB_AGENT_TOKEN: ${OPEN_WEB_AGENT_TOKEN:-}
+      OPEN_WEB_AGENT_MAX_STEPS: ${OPEN_WEB_AGENT_MAX_STEPS:-120}
+      OPEN_WEB_AGENT_CONCURRENCY: ${OPEN_WEB_AGENT_CONCURRENCY:-2}
+      OPEN_WEB_AGENT_STATE_DB: /data/open-web-agent.sqlite
+      OPEN_WEB_AGENT_USE_VISION: ${OPEN_WEB_AGENT_USE_VISION:-false}
+      BROWSER_USE_HEADLESS: ${BROWSER_USE_HEADLESS:-true}
+      LOCAL_LLM_PROVIDER: ${LOCAL_LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-65536}
+      OPENAI_COMPATIBLE_BASE_URL: ${OPENAI_COMPATIBLE_BASE_URL:-http://browser-model:8000/v1}
+      OPENAI_COMPATIBLE_MODEL: ${OPENAI_COMPATIBLE_MODEL:-browser-use/bu-30b-a3b-preview}
+      OPENAI_COMPATIBLE_API_KEY: ${OPENAI_COMPATIBLE_API_KEY:-not-needed}
+      SEARXNG_URL: http://searxng:8080
+    volumes:
+      - worklancer-agent-state:/data
+    shm_size: "2gb"
+    expose:
+      - "8000"
+
+  baserow:
+    image: baserow/baserow:latest
+    profiles: ["baserow"]
+    restart: unless-stopped
+    environment:
+      BASEROW_PUBLIC_URL: ${BASEROW_PUBLIC_URL:-http://localhost:8090}
+    volumes:
+      - worklancer-baserow:/baserow/data
+    ports:
+      - "127.0.0.1:8090:80"
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      open-web-agent:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY:?Set APP_KEY}
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: worklancer
+      DB_USERNAME: worklancer
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      OPEN_WEB_AGENT_ENDPOINT: http://open-web-agent:8000
+      OPEN_WEB_AGENT_HEALTH_ENDPOINT: http://open-web-agent:8000/health
+      OPEN_WEB_AGENT_TOKEN: ${OPEN_WEB_AGENT_TOKEN:-}
+      GALIKA_OPEN_SEARCH_ENABLED: "true"
+      GALIKA_OPEN_SEARCH_RESULTS_PER_QUERY: ${GALIKA_OPEN_SEARCH_RESULTS_PER_QUERY:-12}
+      GALIKA_OPEN_FETCH_FALLBACK: "true"
+      BASEROW_ENABLED: ${BASEROW_ENABLED:-false}
+      BASEROW_URL: ${BASEROW_URL:-http://baserow}
+      BASEROW_TOKEN: ${BASEROW_TOKEN:-}
+      BASEROW_TABLE_ID: ${BASEROW_TABLE_ID:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      LINKEDIN_REDIRECT_URI: ${LINKEDIN_REDIRECT_URI:-}
+      LEVER_CLIENT_ID: ${LEVER_CLIENT_ID:-}
+      LEVER_CLIENT_SECRET: ${LEVER_CLIENT_SECRET:-}
+      LEVER_REDIRECT_URI: ${LEVER_REDIRECT_URI:-}
+    ports:
+      - "127.0.0.1:8088:8000"
+
+volumes:
+  worklancer-postgres:
+  worklancer-redis:
+  worklancer-ollama:
+  worklancer-agent-state:
+  worklancer-baserow:

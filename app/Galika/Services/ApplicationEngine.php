@@ -1,6 +1,7 @@
 <?php
 namespace App\Galika\Services;
 
+use App\Galika\Contracts\BrowserExecutionProvider;
 use App\Models\GalikaApplication;
 use App\Models\GalikaApplicationAnswer;
 use App\Models\GalikaDecision;
@@ -17,7 +18,7 @@ class ApplicationEngine
         private GalikaAIService $ai,
         private PolicyEngine $policies,
         private PlatformCircuitBreaker $circuit,
-        private TinyFishAdapter $tinyfish,
+        private BrowserExecutionProvider $browser,
         private FollowUpService $followUp,
         private DocumentGenerationService $documents,
         private AtsRouter $ats,
@@ -130,7 +131,7 @@ class ApplicationEngine
         $campaign=$this->campaigns->plan($userId,$o);
         $this->campaignExec->materialize($campaign);
 
-        if(!$this->circuit->available('tinyfish')){
+        if(!$this->circuit->available('open_web_agent')){
             $a->update(['status'=>'FAILED_RETRYING','blocker'=>'RATE_LIMIT','failure_class'=>'RATE_LIMIT','next_retry_at'=>now()->addMinutes(10)]);
             return $a;
         }
@@ -167,7 +168,7 @@ class ApplicationEngine
                 ->mapWithKeys(fn($x)=>[$x->question=>$x->answer])->all();
 
             $candidate=$this->deepPrivacy->filter($a->user_id,$candidate,'APPLICATION');
-            $data=$this->tinyfish->apply($a,$o,$candidate,$answers,$attachments);
+            $data=$this->browser->apply($a,$o,$candidate,$answers,$attachments);
 
             if(!($data['submitted']??false)||empty($data['confirmation'])){
                 $failure=$data['failure_class']??'OTHER';
@@ -187,7 +188,7 @@ class ApplicationEngine
             DB::transaction(function()use($a,$o,$data,$pack){
                 $a->update([
                     'status'=>'SUBMITTED_CONFIRMED',
-                    'route'=>$data['route']??strtolower($a->ats_type??'tinyfish'),
+                    'route'=>$data['route']??strtolower($a->ats_type??'open_web_agent'),
                     'submitted_at'=>now(),
                     'confirmation_at'=>now(),
                     'confirmation_id'=>$data['confirmation_id']??null,
@@ -201,13 +202,13 @@ class ApplicationEngine
                 ]);
             });
 
-            $this->circuit->success('tinyfish');
+            $this->circuit->success('open_web_agent');
             $this->followUp->schedule($a);
             $this->sourceMetrics->bump($o->source,'submitted');
             if($o->employer_id){$employer=\App\Models\GalikaEmployer::find($o->employer_id);if($employer)$this->employerMemory->refresh($a->user_id,$employer);}
             return $a->refresh();
         }catch(Throwable $e){
-            $this->circuit->failure('tinyfish',$e->getMessage());
+            $this->circuit->failure('open_web_agent',$e->getMessage());
             $a->update([
                 'status'=>'FAILED_RETRYING',
                 'blocker'=>'SITE_ERROR',

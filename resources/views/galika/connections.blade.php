@@ -1,16 +1,16 @@
 @extends('galika.layout')
 @section('title','GALIKA Connections')
 @section('content')
-<h2>Connect your accounts</h2>
-<p class="text-muted">For supported providers, sign in on the provider's own page and authorize GALIKA. You do not need to copy access tokens manually.</p>
+<h2>Connections & local execution</h2>
+<p class="text-muted">User-authorized providers remain user-scoped. Browser execution and operational projection are now self-hosted system services, so GALIKA no longer requires TinyFish or Airtable credentials.</p>
 
-@php($oauthProviders=['gmail','airtable','linkedin','lever'])
-@php($keyProviders=['openai','tinyfish'])
+@php($oauthProviders=['gmail','linkedin','lever'])
+@php($keyProviders=['openai'])
 
 <div class="row g-3 mb-4">
 @foreach($oauthProviders as $provider)
 @php($c=$connections->firstWhere('provider',$provider))
-<div class="col-md-6 col-xl-3">
+<div class="col-md-6 col-xl-4">
   <div class="card p-3 h-100">
     <h5 class="text-capitalize">{{ $provider }}</h5>
     <div class="mb-2">
@@ -18,7 +18,6 @@
     </div>
     <p class="small text-muted mb-3">
       @if($provider==='gmail')Mail discovery, submission evidence, recruiter replies and follow-up.
-      @elseif($provider==='airtable')Operational sync and GALIKA control-plane data.
       @elseif($provider==='linkedin')User-authorized LinkedIn identity/data access where granted scopes permit.
       @elseif($provider==='lever')OAuth-backed Lever access where the connected account and scopes permit.
       @endif
@@ -29,22 +28,26 @@
         <button class="btn btn-outline-secondary btn-sm">Run health test</button>
       </form>
     @endif
-    @if($provider==='airtable' && $c)
-      @if($airtableError)
-        <div class="alert alert-warning mt-3 py-2 small">{{ $airtableError }}</div>
-      @elseif(count($bases))
-        <form method="post" action="{{ route('galika.connections.airtable.base') }}" class="mt-3">@csrf
-          <label class="form-label small">Airtable base</label>
-          <select class="form-select form-select-sm" name="base_id" onchange="this.form.base_name.value=this.options[this.selectedIndex].dataset.name">
-            <option value="">Choose a base</option>
-            @foreach($bases as $base)
-              <option value="{{ $base['id'] }}" data-name="{{ $base['name'] }}" @selected(data_get($c->metadata,'base_id')===$base['id'])>{{ $base['name'] }}</option>
-            @endforeach
-          </select>
-          <input type="hidden" name="base_name" value="{{ data_get($c->metadata,'base_name') }}">
-          <button class="btn btn-outline-primary btn-sm mt-2">Use this base</button>
-        </form>
-      @endif
+  </div>
+</div>
+@endforeach
+</div>
+
+<h4>Self-hosted system services</h4>
+<p class="text-muted">These services are configured by deployment environment variables and do not consume per-user credits.</p>
+<div class="row g-3 mb-4">
+@foreach($systemServices as $provider=>$service)
+<div class="col-md-6">
+  <div class="card p-3 h-100">
+    <h5>{{ $provider==='open_web_agent' ? 'Open Web Agent' : 'Baserow' }}</h5>
+    <div class="mb-2">
+      <span class="badge {{ $service['configured'] ? 'bg-success' : 'bg-secondary' }}">{{ $service['configured'] ? 'CONFIGURED' : 'OPTIONAL / NOT CONFIGURED' }}</span>
+    </div>
+    <p class="small text-muted">{{ $service['description'] }}</p>
+    @if($service['configured'])
+      <form method="post" action="{{ route('galika.connections.test',$provider) }}">@csrf
+        <button class="btn btn-outline-secondary btn-sm">Run health test</button>
+      </form>
     @endif
   </div>
 </div>
@@ -52,7 +55,7 @@
 </div>
 
 <h4>Service credentials</h4>
-<p class="text-muted">These providers use service/API credentials rather than end-user OAuth in this deployment.</p>
+<p class="text-muted">Only providers that still require an external API credential appear here.</p>
 <div class="row g-3">
 @foreach($keyProviders as $provider)
 @php($c=$connections->firstWhere('provider',$provider))

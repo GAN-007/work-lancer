@@ -103,7 +103,7 @@ class GalikaEconomicResilienceTest extends TestCase
     {
         $user=User::factory()->create();
         DB::table('galika_outbox')->insert([
-            'event_id'=>'evt-1','user_id'=>$user->id,'destination'=>'airtable','kind'=>'TEST',
+            'event_id'=>'evt-1','user_id'=>$user->id,'destination'=>'baserow','kind'=>'TEST',
             'payload'=>json_encode(['x'=>1]),'status'=>'RETRY','attempts'=>8,
             'available_at'=>now(),'leased_until'=>null,'last_error'=>'broken',
             'created_at'=>now(),'updated_at'=>now()

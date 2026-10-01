@@ -15,14 +15,6 @@ return [
    'scopes'=>['openid','email','https://www.googleapis.com/auth/gmail.readonly','https://www.googleapis.com/auth/gmail.send'],
    'authorize_params'=>['access_type'=>'offline','prompt'=>'consent','include_granted_scopes'=>'true'],
   ],
-  'airtable'=>[
-   'client_id'=>env('AIRTABLE_OAUTH_CLIENT_ID'),
-   'client_secret'=>env('AIRTABLE_OAUTH_CLIENT_SECRET'),
-   'redirect_uri'=>env('AIRTABLE_OAUTH_REDIRECT_URI'),
-   'authorize_url'=>'https://airtable.com/oauth2/v1/authorize',
-   'token_url'=>'https://airtable.com/oauth2/v1/token',
-   'scopes'=>['data.records:read','data.records:write','schema.bases:read'],
-  ],
   'linkedin'=>[
    'client_id'=>env('LINKEDIN_CLIENT_ID'),
    'client_secret'=>env('LINKEDIN_CLIENT_SECRET'),
@@ -40,8 +32,19 @@ return [
    'scopes'=>array_values(array_filter(array_map('trim',explode(',',env('LEVER_SCOPES',''))))),
   ],
  ],
- 'airtable'=>['token'=>env('AIRTABLE_TOKEN'),'base_id'=>env('AIRTABLE_BASE_ID')],
- 'tinyfish'=>['key'=>env('TINYFISH_API_KEY'),'endpoint'=>env('TINYFISH_ENDPOINT'),'health_endpoint'=>env('TINYFISH_HEALTH_ENDPOINT')],
+ 'open_web_agent'=>[
+  'endpoint'=>env('OPEN_WEB_AGENT_ENDPOINT','http://open-web-agent:8000'),
+  'health_endpoint'=>env('OPEN_WEB_AGENT_HEALTH_ENDPOINT'),
+  'token'=>env('OPEN_WEB_AGENT_TOKEN'),
+  'timeout'=>(int)env('OPEN_WEB_AGENT_TIMEOUT',300),
+  'max_attachment_bytes'=>(int)env('OPEN_WEB_AGENT_MAX_ATTACHMENT_BYTES',12582912),
+ ],
+ 'baserow'=>[
+  'enabled'=>filter_var(env('BASEROW_ENABLED',false),FILTER_VALIDATE_BOOL),
+  'url'=>env('BASEROW_URL','http://baserow'),
+  'token'=>env('BASEROW_TOKEN'),
+  'table_id'=>env('BASEROW_TABLE_ID'),
+ ],
  'jobicy'=>['endpoint'=>env('JOBICY_ENDPOINT','https://jobicy.com/api/v2/remote-jobs')],
  'galika'=>['health_token'=>env('GALIKA_HEALTH_TOKEN')],
 ];

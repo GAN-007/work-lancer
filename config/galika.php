@@ -4,8 +4,16 @@ return [
  'fresh_primary_hours'=>(int)env('GALIKA_FRESH_PRIMARY_HOURS',12),
  'fresh_fallback_hours'=>(int)env('GALIKA_FRESH_FALLBACK_HOURS',24),
  'openai'=>['model'=>env('GALIKA_OPENAI_MODEL','gpt-5.6')],
- 'discovery'=>['queries'=>array_values(array_filter(array_map('trim',explode(',',env('GALIKA_DISCOVERY_QUERIES','AI Engineer,Machine Learning Engineer,Data Scientist,Data Engineer,Full Stack Developer,Backend Engineer,Technical Lead,AI Finance')))))],
- 'airtable'=>['critical_path'=>false,'replica_only'=>true],
+ 'discovery'=>[
+     'queries'=>array_values(array_filter(array_map('trim',explode(',',env('GALIKA_DISCOVERY_QUERIES','AI Engineer,Machine Learning Engineer,Data Scientist,Data Engineer,Full Stack Developer,Backend Engineer,Technical Lead,AI Finance'))))),
+     'open_search_enabled'=>filter_var(env('GALIKA_OPEN_SEARCH_ENABLED',false),FILTER_VALIDATE_BOOL),
+     'open_search_results_per_query'=>(int)env('GALIKA_OPEN_SEARCH_RESULTS_PER_QUERY',12),
+     'open_fetch_fallback'=>filter_var(env('GALIKA_OPEN_FETCH_FALLBACK',false),FILTER_VALIDATE_BOOL),
+ ],
+ 'projection'=>[
+     'driver'=>'postgres',
+     'baserow_mirror'=>filter_var(env('BASEROW_ENABLED',false),FILTER_VALIDATE_BOOL),
+ ],
  'confirmation_required'=>true,
  'system_one'=>[
      'mode'=>env('GALIKA_SYSTEM_ONE_MODE','off'),

@@ -25,7 +25,7 @@ class GalikaRuntimeDoctor extends Command
         }
 
         if ($this->option('require-external')) {
-            foreach (['OPENAI_API_KEY','TINYFISH_ENDPOINT'] as $key) {
+            foreach (['OPENAI_API_KEY','OPEN_WEB_AGENT_ENDPOINT'] as $key) {
                 $ok=(string)env($key)!=='';
                 $checks['env:'.$key]=['ok'=>$ok,'detail'=>$ok?'configured':'missing'];
                 $ok ? $this->line("PASS env:{$key}") : $this->error("FAIL env:{$key} missing");
