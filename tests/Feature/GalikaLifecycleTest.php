@@ -235,7 +235,8 @@ class GalikaLifecycleTest extends TestCase
             ->assertSee('Open Web Agent')
             ->assertSee('Baserow')
             ->assertDontSee('Connect Airtable')
-            ->assertDontSee('TinyFish');
+            ->assertDontSee('Connect TinyFish')
+            ->assertDontSee('TinyFish API key');
     }
 
     public function test_open_source_system_services_are_visible_without_per_user_tokens(): void
