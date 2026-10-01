@@ -182,7 +182,7 @@ The user's global pause switch always takes precedence.
 10. require explicit submission confirmation
 11. schedule follow-up only after confirmed submission
 
-The TinyFish adapter is wired as the browser-execution provider.
+`OpenWebAgentAdapter` is wired as the browser-execution provider. It calls the self-hosted Open Web Agent sidecar, which uses Browser Use + Playwright with a local model and returns the same confirmation/failure contract expected by `ApplicationEngine`.
 
 A route may return a failure class such as:
 
@@ -398,8 +398,8 @@ Legacy Work-Lancer marketplace routes remain available for:
 
 - OpenAI
 - Gmail API
-- Airtable API
-- TinyFish browser automation
+- PostgreSQL authoritative operational ledger with optional self-hosted Baserow mirror
+- Self-hosted Browser Use + Playwright browser automation
 - Jobicy
 
 The code is intentionally credential-free. Secrets are injected at runtime.
@@ -487,11 +487,13 @@ OPENAI_API_KEY=
 GMAIL_ACCESS_TOKEN=
 GMAIL_FROM=
 
-AIRTABLE_TOKEN=
-AIRTABLE_BASE_ID=
-
-TINYFISH_API_KEY=
-TINYFISH_ENDPOINT=
+OPEN_WEB_AGENT_ENDPOINT=http://open-web-agent:8000
+OPEN_WEB_AGENT_HEALTH_ENDPOINT=http://open-web-agent:8000/health
+OPEN_WEB_AGENT_TOKEN=
+BASEROW_ENABLED=false
+BASEROW_URL=http://baserow
+BASEROW_TOKEN=
+BASEROW_TABLE_ID=
 
 JOBICY_ENDPOINT=https://jobicy.com/api/v2/remote-jobs
 ```
@@ -571,8 +573,9 @@ Laravel application
 External services
    +-- OpenAI
    +-- Gmail
-   +-- Airtable
-   +-- TinyFish
+   +-- Open Web Agent (Browser Use + Playwright + local LLM)
+   +-- SearXNG + Crawl4AI
+   +-- optional Baserow projection
    +-- job sources / ATS platforms
 ```
 
@@ -660,8 +663,8 @@ Never commit:
 - browser cookies
 - Gmail access tokens
 - OpenAI keys
-- Airtable tokens
-- TinyFish tokens
+- Baserow tokens
+- Open Web Agent bearer tokens
 
 GALIKA also provides user-level autonomy controls so an individual user can disable autonomous execution without shutting down the entire platform.
 
@@ -681,7 +684,8 @@ app/
     Contracts/
     Enums/
     Services/
-      AirtableAdapter.php
+      BaserowAdapter.php
+      BaserowReplicaService.php
       ApplicationEngine.php
       CanonicalizationService.php
       DeliveryReconciliationService.php
@@ -691,7 +695,8 @@ app/
       GmailAdapter.php
       PlatformCircuitBreaker.php
       PolicyEngine.php
-      TinyFishAdapter.php
+      OpenWebAgentAdapter.php
+      OpenWebResearchAdapter.php
       WorkQueueService.php
 
   Http/
@@ -762,8 +767,8 @@ Work-Lancer 2.0 now supports per-user credential and connection state rather tha
 
 - Gmail: OAuth 2.0 connection flow with user-scoped tokens
 - OpenAI: encrypted per-user API key storage
-- Airtable: encrypted per-user API token storage
-- TinyFish: encrypted per-user API key storage
+- Baserow: optional deployment-level self-hosted projection; PostgreSQL remains authoritative
+- Open Web Agent: self-hosted browser/search/fetch execution; no TinyFish credit dependency
 - Connection health testing from the GALIKA Connections screen
 
 ## CV ingestion and evidence confirmation
