@@ -9,7 +9,7 @@ FROM php:8.2-cli
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip libzip-dev libpq-dev poppler-utils supervisor $PHPIZE_DEPS \
-    && pecl install redis \
+    && printf '\n\n\n\n\n\n' | pecl install redis \
     && docker-php-ext-enable redis \
     && docker-php-ext-install pdo pdo_mysql pdo_pgsql zip \
     && apt-get purge -y --auto-remove $PHPIZE_DEPS \
