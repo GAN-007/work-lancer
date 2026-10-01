@@ -1,5 +1,10 @@
 FROM php:8.2-cli
-RUN apt-get update && apt-get install -y git unzip libzip-dev poppler-utils supervisor && docker-php-ext-install pdo pdo_mysql zip
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git unzip libzip-dev libpq-dev poppler-utils supervisor \
+    && docker-php-ext-install pdo pdo_mysql pdo_pgsql zip \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /var/www/html
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY . .

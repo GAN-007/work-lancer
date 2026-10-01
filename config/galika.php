@@ -5,7 +5,10 @@ return [
  'fresh_fallback_hours'=>(int)env('GALIKA_FRESH_FALLBACK_HOURS',24),
  'openai'=>['model'=>env('GALIKA_OPENAI_MODEL','gpt-5.6')],
  'discovery'=>['queries'=>array_values(array_filter(array_map('trim',explode(',',env('GALIKA_DISCOVERY_QUERIES','AI Engineer,Machine Learning Engineer,Data Scientist,Data Engineer,Full Stack Developer,Backend Engineer,Technical Lead,AI Finance')))))],
- 'airtable'=>['critical_path'=>false,'replica_only'=>true],
+ 'projection'=>[
+     'driver'=>'postgres',
+     'baserow_mirror'=>filter_var(env('BASEROW_ENABLED',false),FILTER_VALIDATE_BOOL),
+ ],
  'confirmation_required'=>true,
  'system_one'=>[
      'mode'=>env('GALIKA_SYSTEM_ONE_MODE','off'),
