@@ -51,7 +51,8 @@ jobs:
       - name: Validate sidecar syntax and imports
         run: |
           python -m py_compile services/open-web-agent/app.py
-          python -c "import browser_use, crawl4ai, fastapi, httpx; print('open-source execution dependencies import successfully')"
+          python -c "import browser_use, crawl4ai, fastapi, httpx, pydantic_settings; print('open-source execution dependencies import successfully')"
+          python -c "import importlib.util; spec=importlib.util.spec_from_file_location('worklancer_open_web_agent','services/open-web-agent/app.py'); module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); print('open-web-agent app imports successfully')"
       - name: Validate Docker Compose topology
         env:
           APP_KEY: base64:dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0
