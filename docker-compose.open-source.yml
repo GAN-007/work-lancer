@@ -141,6 +141,7 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
+      APP_URL: http://127.0.0.1:${WORKLANCER_PORT:-8088}
       APP_KEY: ${APP_KEY:?Set APP_KEY}
       DB_CONNECTION: pgsql
       DB_HOST: postgres
@@ -155,6 +156,7 @@ services:
       OPEN_WEB_AGENT_ENDPOINT: http://open-web-agent:8000
       OPEN_WEB_AGENT_HEALTH_ENDPOINT: http://open-web-agent:8000/health
       OPEN_WEB_AGENT_TOKEN: ${OPEN_WEB_AGENT_TOKEN:-}
+      GALIKA_HEALTH_TOKEN: ${GALIKA_HEALTH_TOKEN:-}
       GALIKA_OPEN_SEARCH_ENABLED: "true"
       GALIKA_OPEN_SEARCH_RESULTS_PER_QUERY: ${GALIKA_OPEN_SEARCH_RESULTS_PER_QUERY:-12}
       GALIKA_OPEN_FETCH_FALLBACK: "true"
@@ -173,7 +175,7 @@ services:
       LEVER_CLIENT_SECRET: ${LEVER_CLIENT_SECRET:-}
       LEVER_REDIRECT_URI: ${LEVER_REDIRECT_URI:-}
     ports:
-      - "127.0.0.1:8088:8000"
+      - "127.0.0.1:${WORKLANCER_PORT:-8088}:8000"
 
 volumes:
   worklancer-postgres:
